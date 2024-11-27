@@ -1,80 +1,148 @@
-# 🏗 Scaffold-ETH 2
+# Paythena - Decentralized Payroll System with Salary-Backed Lending on Ethena Protocol
 
-<h4 align="center">
-  <a href="https://docs.scaffoldeth.io">Documentation</a> |
-  <a href="https://scaffoldeth.io">Website</a>
-</h4>
+## 🚀 Overview
 
-🧪 An open-source, up-to-date toolkit for building decentralized applications (dapps) on the Ethereum blockchain. It's designed to make it easier for developers to create and deploy smart contracts and build user interfaces that interact with those contracts.
+Paythena is a decentralized payroll solution built on the Ethena Protocol that revolutionizes traditional salary processing by combining it with innovative salary-backed lending. The system uses USDe (Ethena's synthetic dollar) for stable payments and yield generation, creating a comprehensive financial solution for both Business and contractors.
 
-⚙️ Built using NextJS, RainbowKit, Hardhat, Wagmi, Viem, and Typescript.
+## Paythena: Problems to Solve 
 
-- ✅ **Contract Hot Reload**: Your frontend auto-adapts to your smart contract as you edit it.
-- 🪝 **[Custom hooks](https://docs.scaffoldeth.io/hooks/)**: Collection of React hooks wrapper around [wagmi](https://wagmi.sh/) to simplify interactions with smart contracts with typescript autocompletion.
-- 🧱 [**Components**](https://docs.scaffoldeth.io/components/): Collection of common web3 components to quickly build your frontend.
-- 🔥 **Burner Wallet & Local Faucet**: Quickly test your application with a burner wallet and local faucet.
-- 🔐 **Integration with Wallet Providers**: Connect to different wallet providers and interact with the Ethereum network.
+A. Traditional Payroll Issues
 
-![Debug Contracts tab](https://github.com/scaffold-eth/scaffold-eth-2/assets/55535804/b237af0c-5027-4849-a5c1-2e31495cccb1)
+1. Traditional: 
+- High Fees: 3-5% international transfer fees,
+- Slow Settlement: 2-5 business days,
+- NoYield: Idle treasury funds,
+- Global  remote talent access.
+- Complex Compliance: Manual reporting
 
-## Requirements
+2. Web3 Specific: 
+- UX/UI: Lack of seamless experience for non-technical users,
+- L2 Overwhelming: Overwhelming L2 experiences for users,
+- Integration: Complex DeFi interactions.
 
-Before you begin, you need to install the following tools:
+B. Current Market Gaps
 
-- [Node (>= v18.18)](https://nodejs.org/en/download/)
-- Yarn ([v1](https://classic.yarnpkg.com/en/docs/install/) or [v2+](https://yarnpkg.com/getting-started/install))
-- [Git](https://git-scm.com/downloads)
-
-## Quickstart
-
-To get started with Scaffold-ETH 2, follow the steps below:
-
-1. Install dependencies if it was skipped in CLI:
-
-```
-cd my-dapp-example
-yarn install
-```
-
-2. Run a local network in the first terminal:
-
-```
-yarn chain
-```
-
-This command starts a local Ethereum network using Hardhat. The network runs on your local machine and can be used for testing and development. You can customize the network configuration in `packages/hardhat/hardhat.config.ts`.
-
-3. On a second terminal, deploy the test contract:
-
-```
-yarn deploy
-```
-
-This command deploys a test smart contract to the local network. The contract is located in `packages/hardhat/contracts` and can be modified to suit your needs. The `yarn deploy` command uses the deploy script located in `packages/hardhat/deploy` to deploy the contract to the network. You can also customize the deploy script.
-
-4. On a third terminal, start your NextJS app:
-
-```
-yarn start
-```
-
-Visit your app on: `http://localhost:3000`. You can interact with your smart contract using the `Debug Contracts` page. You can tweak the app config in `packages/nextjs/scaffold.config.ts`.
-
-Run smart contract test with `yarn hardhat:test`
-
-- Edit your smart contracts in `packages/hardhat/contracts`
-- Edit your frontend homepage at `packages/nextjs/app/page.tsx`. For guidance on [routing](https://nextjs.org/docs/app/building-your-application/routing/defining-routes) and configuring [pages/layouts](https://nextjs.org/docs/app/building-your-application/routing/pages-and-layouts) checkout the Next.js documentation.
-- Edit your deployment scripts in `packages/hardhat/deploy`
+1. Lack of stable decentralized payroll solutions(💡 Mostly Hibrid and Centralized solutions in the market)
+2. No yield generation on treasury funds (💡 Ethena and USDe solve these problem with APY up to 25%).
+3. Complex DeFi interactions for non-technical users(💡 Paythena will put Strong Focus on UX/UI and balanced between user experience and security)
+4. Limited compliance tools(💡 Global compliance maintaining compliance at a local level for every contributor.)
 
 
-## Documentation
+## ✨ Key Features
 
-Visit our [docs](https://docs.scaffoldeth.io) to learn how to start building with Scaffold-ETH 2.
+### 💡 Smart Salary Splitting & Auto-DeFi
 
-To know more about its features, check out our [website](https://scaffoldeth.io).
+### 🏆 Lending Score System
 
-## Contributing to Scaffold-ETH 2
+### 💡 Undercollateralized Lending
 
-We welcome contributions to Scaffold-ETH 2!
+### 🏆 Yield Generation Features
 
-Please see [CONTRIBUTING.MD](https://github.com/scaffold-eth/scaffold-eth-2/blob/main/CONTRIBUTING.md) for more information and guidelines for contributing to Scaffold-ETH 2.
+
+### 📊 Real-Time Analytics
+- Track yield generation
+- Monitor payment history
+- Visualize earning patterns
+
+
+## 🔧 Technology Stack
+
+- **Blockchain**: Ethereum
+- **Smart Contracts**: Solidity
+- **Frontend**: React, TypeScript
+- **Styling**: Tailwind CSS
+- **Testing**: Hardhat, Chai
+
+## 📈 Features Breakdown
+
+### 1. Salary Management
+- Employee onboarding
+- Automated payments
+- Custom payment schedules
+
+### 2. Treasury Operations
+
+
+## 🔐 Basic Security
+
+- Non-reentrant functions
+- Access control implementation
+- Emergency pause functionality
+- Multi-sig treasury operations
+
+<<<<<<< HEAD
+## 🔐 Security Notice
+=======
+## ⚠️ SECURITY NOTICE
+>>>>>>> parent of 54b0ce6 (Update README.md)
+
+### Development Status
+- All contracts deployed on **TESTNET ONLY**
+- **HACKATHON PHASE** - Not production ready
+- **NOT AUDITED**
+
+### ⛔ WARNING
+- **DO NOT DEPLOY TO MAINNET**
+- **DO NOT USE REAL FUNDS**
+- For demonstration purposes only
+
+### Current Status
+- Network: Ble Testnet
+- Purpose: Hackathon Demo
+- Stage: Proof of Concept
+
+### Safe Usage
+- ✅ Testing and development
+- ✅ Hackathon demonstration
+- ❌ Production/Mainnet deployment
+- ❌ Real fund management  
+
+
+## 🎯 Roadmap
+
+- [x] Core payroll functionality
+- [x] Salary splitting
+- [x] Yield System
+- [x] Lending System
+- [ ] Mobile app
+- [ ] Advanced analytics
+- [ ] DAO integration
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🏆 Hackathon Success
+
+Built during the Ethena Protocol Hackathon 2024 by Encode . Features implemented:
+- Salary splitting mechanism
+- Yield generation
+- Lending system
+- Analytics dashboard
+- USDe integration
+
+## 👥 Team
+
+- [Efrain Cuello](https://github.com/0xefrain) - Full Stack Developer
+
+
+## 📞 Contact
+
+- Discord: [Join our server](discord_link)
+- Twitter: [@PaythenaFi](twitter_link)
+- Email: contact@paythena.xyz
+
+## 🙏 Acknowledgments
+
+- Ethena Protocol team
+- Encode Hackaton
+
+---
+
+<p align="center">
+  Built with ❤️ From Thailand 
+</p>
