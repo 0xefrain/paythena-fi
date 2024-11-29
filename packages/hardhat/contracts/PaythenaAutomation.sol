@@ -17,6 +17,8 @@ contract PaythenaAutomation is ReentrancyGuard, AccessControl, Pausable {
     uint256 public constant PROCESSING_INTERVAL = 1 days;
     uint256 public constant MAX_BATCH_SIZE = 50;
 
+    mapping(address => bool) public automatedCompanies;
+
     event PaymentsProcessed(
         uint256 processedCount,
         uint256 timestamp
@@ -27,9 +29,12 @@ contract PaythenaAutomation is ReentrancyGuard, AccessControl, Pausable {
         uint256 timestamp
     );
 
+    event AutomationEnabled(address indexed company);
+    event AutomationDisabled(address indexed company);
+    
     constructor(address _core) {
         require(_core != address(0), "Invalid core address");
-        require(_core.code.length == 0, "Core must be EOA");
+        require(_core.code.length > 0, "Core must be contract");
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(AUTOMATION_ROLE, msg.sender);
@@ -39,7 +44,7 @@ contract PaythenaAutomation is ReentrancyGuard, AccessControl, Pausable {
 
         emit AutomationConfigured(_core, block.timestamp);
     }
-
+    
     function processPaymentBatch() 
         external 
         nonReentrant 
@@ -91,5 +96,17 @@ contract PaythenaAutomation is ReentrancyGuard, AccessControl, Pausable {
         onlyRole(DEFAULT_ADMIN_ROLE) 
     {
         _unpause();
+    }
+
+    function enableAutomation() external {
+        require(!automatedCompanies[msg.sender], "Already automated");
+        automatedCompanies[msg.sender] = true;
+        emit AutomationEnabled(msg.sender);
+    }
+
+    function disableAutomation() external {
+        require(automatedCompanies[msg.sender], "Not automated");
+        automatedCompanies[msg.sender] = false;
+        emit AutomationDisabled(msg.sender);
     }
 }

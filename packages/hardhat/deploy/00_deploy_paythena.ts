@@ -40,6 +40,13 @@ const deployPaythena: DeployFunction = async function (hre: HardhatRuntimeEnviro
     log: true,
   });
 
+  // Deploy PaythenaAutomation after PaythenaCore
+  await deploy("PaythenaAutomation", {
+    from: deployer,
+    args: [paythenaCore.address],
+    log: true,
+  });
+
   // Optional: Mint some test tokens to deployer
   const mockUsdeContract = await hre.ethers.getContractAt(
     "MockUSDe",

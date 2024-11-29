@@ -8,9 +8,10 @@ interface ConfigureSalaryModalProps {
   onClose: () => void;
   contributorAddress: string;
   companyAddress: string | undefined;
+  onSuccess?: () => Promise<void>;
 }
 
-export const ConfigureSalaryModal = ({ isOpen, onClose, contributorAddress, companyAddress }: ConfigureSalaryModalProps) => {
+export const ConfigureSalaryModal = ({ isOpen, onClose, contributorAddress, companyAddress, onSuccess }: ConfigureSalaryModalProps) => {
   const [salary, setSalary] = useState("");
   const [frequency, setFrequency] = useState("");
 
@@ -34,7 +35,8 @@ export const ConfigureSalaryModal = ({ isOpen, onClose, contributorAddress, comp
         ] as const,
       });
       notification.success("Salary configured successfully!");
-      onClose();
+      if (onSuccess) await onSuccess();
+      else onClose();
     } catch (error) {
       console.error("Configure salary error:", error);
       notification.error("Failed to configure salary");

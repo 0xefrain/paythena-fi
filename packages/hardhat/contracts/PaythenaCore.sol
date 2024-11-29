@@ -89,6 +89,14 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
         string description;
     }
 
+    struct PaymentRecord {
+        uint256 paymentId;
+        bytes32 txHash;
+        uint256 timestamp;
+        uint256 amount;
+        bool processed;
+    }
+
     struct ContributorDebugInfo {
         string name;
         uint256 salary;
@@ -97,9 +105,11 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
         bool companyActive;
         uint256 paymentFrequency;
         uint256 nextPayment;
+        uint256 lastPayment;
         uint256 contributorCount;
         bool isCompanyRole;
         bool isContributorRole;
+        PaymentRecord[] recentPayments;
     }
 
     // Mappings
@@ -108,6 +118,9 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
     mapping(address => PaymentHistory[]) private paymentHistories;
     uint256 public constant MAX_PAYMENT_HISTORY = 10;
     uint256 public constant MAX_ACTIVE_CONTRIBUTORS = 50;
+    mapping(address => mapping(address => PaymentRecord[])) private paymentRecords;
+    mapping(bytes32 => bool) private processedTxs;
+    uint256 private nextPaymentId = 1;
 
     // Events
     event CompanyRegistered(
@@ -201,6 +214,16 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
     error PaymentFailed();
     error PaymentNotDue();
     error InsufficientAllowance();
+
+    // Add new event for payment tracking
+    event PaymentProcessed(
+        uint256 indexed paymentId,
+        address indexed company,
+        address indexed contributor,
+        uint256 amount,
+        bytes32 txHash,
+        uint256 timestamp
+    );
 
     /**
      * @notice Contract constructor
@@ -334,17 +357,57 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
         require(block.timestamp >= contributor.nextPayment, "Payment not due");
         require(company.balance >= contributor.salary, "Insufficient balance");
 
-        company.balance -= contributor.salary;
-        contributor.lastProcessedTime = block.timestamp;
-        contributor.nextPayment = block.timestamp + contributor.paymentFrequency;
+        // Generate unique payment ID and tx hash
+        uint256 paymentId = nextPaymentId++;
+        bytes32 txHash = keccak256(abi.encodePacked(
+            msg.sender,
+            _contributor,
+            paymentId,
+            block.timestamp
+        ));
 
+        // Ensure this tx hasn't been processed
+        require(!processedTxs[txHash], "Payment already processed");
+        processedTxs[txHash] = true;
+
+        // Update payment tracking before transfer
+        uint256 currentTime = block.timestamp;
+        company.balance -= contributor.salary;
+        
+        // Update all payment timestamps
+        contributor.lastPayment = currentTime;
+        contributor.lastProcessedTime = currentTime;
+        contributor.nextPayment = currentTime + contributor.paymentFrequency;
+
+        // Record the payment
+        PaymentRecord memory record = PaymentRecord({
+            paymentId: paymentId,
+            txHash: txHash,
+            timestamp: currentTime,
+            amount: contributor.salary,
+            processed: true
+        });
+
+        paymentRecords[msg.sender][_contributor].push(record);
+
+        // Transfer the funds
         usde.safeTransfer(_contributor, contributor.salary);
+
+        // Emit events
+        emit PaymentProcessed(
+            paymentId,
+            msg.sender,
+            _contributor,
+            contributor.salary,
+            txHash,
+            currentTime
+        );
 
         emit SalaryProcessed(
             msg.sender,
             _contributor,
             contributor.salary,
-            block.timestamp
+            currentTime
         );
     }
 
@@ -457,18 +520,18 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
 
     /**
      * @notice Add payment to history
-     * @param contributor Contributor address
-     * @param amount Payment amount
-     * @param description Payment description
+     * @param _contributor Contributor address
+     * @param _amount Payment amount
+     * @param _description Payment description
      */
     function _addPaymentToHistory(
-        address contributor, 
-        uint256 amount, 
-        string memory description
+        address _contributor, 
+        uint256 _amount, 
+        string memory _description
     ) 
         internal 
     {
-        PaymentHistory[] storage history = paymentHistories[contributor];
+        PaymentHistory[] storage history = paymentHistories[_contributor];
         
         if (history.length >= MAX_PAYMENT_HISTORY) {
             // Remove oldest payment if at max capacity
@@ -479,51 +542,10 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
         }
         
         history.push(PaymentHistory({
-            amount: amount,
+            amount: _amount,
             timestamp: block.timestamp,
-            description: description
+            description: _description
         }));
-    }
-
-    /**
-     * @notice Process payment and update history
-     * @param contributor Contributor address
-     */
-    function processPayment(address contributor) 
-        external 
-        nonReentrant 
-        whenNotPaused 
-        returns (uint256)
-    {
-        require(hasRole(COMPANY_ROLE, msg.sender), "Not a company");
-        Company storage company = companies[msg.sender];
-        Contributor storage cont = company.contributors[contributor];
-        
-        require(cont.isActive, "Contributor not active");
-        require(block.timestamp >= cont.nextPayment, "Payment not due");
-        require(company.balance >= cont.salary, "Insufficient balance");
-
-        company.balance -= cont.salary;
-        usde.safeTransfer(contributor, cont.salary);
-        
-        cont.lastPayment = block.timestamp;
-        cont.nextPayment = block.timestamp + cont.paymentFrequency;
-        cont.lastProcessedTime = block.timestamp;
-        
-        _addPaymentToHistory(
-            contributor,
-            cont.salary,
-            "Regular salary payment"
-        );
-        
-        emit SalaryProcessed(
-            msg.sender, 
-            contributor, 
-            cont.salary,
-            block.timestamp
-        );
-        
-        return cont.salary;
     }
 
     /**
@@ -948,39 +970,80 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
         );
     }
 
-    // Main debug function that returns a struct
+    // Add a helper function to get contributor timestamps
+    function getContributorTimestamps(
+        address _company,
+        address _contributor
+    )
+        private
+        view
+        returns (
+            uint256 lastPayment,
+            uint256 nextPayment
+        )
+    {
+        Contributor storage contributor = companies[_company].contributors[_contributor];
+        return (
+            contributor.lastPayment,
+            contributor.nextPayment
+        );
+    }
+
+    // Update the main debug function
     function debugContributor(
         address _company,
         address _contributor
-    ) external view returns (ContributorDebugInfo memory) {
+    ) external view returns (ContributorDebugInfo memory info) {
         Company storage company = companies[_company];
+        Contributor storage contributor = company.contributors[_contributor];
         
-        (
-            string memory name,
-            uint256 salary,
-            bool isActive,
-            bool exists
-        ) = getContributorBasicInfo(_company, _contributor);
-        
-        (
-            uint256 paymentFrequency,
-            uint256 nextPayment,
-            uint256 contributorCount
-        ) = getContributorPaymentInfo(_company, _contributor);
-        
-        (bool isCompanyRole, bool isContributorRole) = getContributorRoles(_company, _contributor);
+        // Build return struct directly
+        info.name = contributor.name;
+        info.salary = contributor.salary;
+        info.isActive = contributor.isActive;
+        info.exists = bytes(contributor.name).length > 0;
+        info.companyActive = company.isActive;
+        info.paymentFrequency = contributor.paymentFrequency;
+        info.nextPayment = contributor.nextPayment;
+        info.lastPayment = contributor.lastPayment;
+        info.contributorCount = company.contributorCount;
+        info.isCompanyRole = hasRole(COMPANY_ROLE, _company);
+        info.isContributorRole = hasRole(CONTRIBUTOR_ROLE, _contributor);
+        info.recentPayments = paymentRecords[_company][_contributor];
 
-        return ContributorDebugInfo({
-            name: name,
-            salary: salary,
-            isActive: isActive,
-            exists: exists,
-            companyActive: company.isActive,
-            paymentFrequency: paymentFrequency,
-            nextPayment: nextPayment,
-            contributorCount: contributorCount,
-            isCompanyRole: isCompanyRole,
-            isContributorRole: isContributorRole
-        });
+        return info;
+    }
+
+    // Add this function for testing
+    function updateNextPayment(address _contributor, uint256 _newNextPayment) 
+        external 
+        whenNotPaused 
+    {
+        require(hasRole(COMPANY_ROLE, msg.sender), "Not a company");
+        Company storage company = companies[msg.sender];
+        require(company.isActive, "Company not active");
+
+        Contributor storage contributor = company.contributors[_contributor];
+        require(contributor.isActive, "Contributor not active");
+
+        // Reset payment tracking when manually setting payment due
+        contributor.lastPayment = 0;  // Reset last payment to allow processing
+        contributor.nextPayment = _newNextPayment;
+        
+        emit ContributorUpdated(
+            msg.sender,
+            _contributor,
+            contributor.salary,
+            contributor.paymentFrequency
+        );
+    }
+
+    // Add function to get payment history
+    function getPaymentHistory(address _company, address _contributor) 
+        external 
+        view 
+        returns (PaymentRecord[] memory) 
+    {
+        return paymentRecords[_company][_contributor];
     }
 }

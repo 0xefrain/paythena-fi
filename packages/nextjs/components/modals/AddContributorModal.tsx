@@ -6,9 +6,10 @@ import { notification } from "~~/utils/scaffold-eth";
 interface AddContributorModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => Promise<void>;
 }
 
-export const AddContributorModal = ({ isOpen, onClose }: AddContributorModalProps) => {
+export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContributorModalProps) => {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [salary, setSalary] = useState("");
@@ -29,7 +30,8 @@ export const AddContributorModal = ({ isOpen, onClose }: AddContributorModalProp
         ] as const,
       });
       notification.success("Contributor added successfully!");
-      onClose();
+      if (onSuccess) await onSuccess();
+      else onClose();
     } catch (error) {
       console.error("Add contributor error:", error);
       notification.error("Failed to add contributor");
