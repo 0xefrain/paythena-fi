@@ -89,6 +89,19 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
         string description;
     }
 
+    struct ContributorDebugInfo {
+        string name;
+        uint256 salary;
+        bool isActive;
+        bool exists;
+        bool companyActive;
+        uint256 paymentFrequency;
+        uint256 nextPayment;
+        uint256 contributorCount;
+        bool isCompanyRole;
+        bool isContributorRole;
+    }
+
     // Mappings
     mapping(address => Company) public companies;
     mapping(address => address) public contributorToCompany;
@@ -136,8 +149,58 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
         uint256 timestamp
     );
 
+    event ContributorUpdated(
+        address indexed company,
+        address indexed contributor,
+        uint256 newSalary,
+        uint256 newFrequency
+    );
+
+    event ContributorDebug(
+        address indexed company,
+        address indexed contributor,
+        string name,
+        uint256 salary,
+        uint256 frequency,
+        bool isActive
+    );
+
+    // Add more detailed debug events
+    event ContributorAddDebug(
+        address indexed company,
+        address indexed contributor,
+        string name,
+        uint256 salary,
+        uint256 frequency,
+        bool isActive,
+        uint256 timestamp
+    );
+
+    event ContributorGetDebug(
+        address indexed company,
+        address indexed contributor,
+        string name,
+        uint256 salary,
+        bool isActive,
+        uint256 timestamp
+    );
+
     // Add storage layout version
     uint256 private constant STORAGE_VERSION = 1;
+
+    // Custom errors
+    error CompanyNotActive();
+    error CompanyAlreadyRegistered();
+    error CompanyNotFound();
+    error InvalidAmount();
+    error InsufficientBalance();
+    error TransferFailed();
+    error InvalidContributor();
+    error ContributorAlreadyExists();
+    error ContributorNotFound();
+    error PaymentFailed();
+    error PaymentNotDue();
+    error InsufficientAllowance();
 
     /**
      * @notice Contract constructor
@@ -215,39 +278,33 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
         string calldata _name,
         uint256 _salary,
         uint256 _paymentFrequency
-    ) 
-        external 
-        nonReentrant 
-        whenNotPaused 
-    {
-        require(_contributor != address(0), "Invalid contributor address");
-        require(_contributor != msg.sender, "Cannot add self as contributor");
-        require(_salary > 0, "Invalid salary");
-        require(_paymentFrequency >= MIN_PAYMENT_FREQUENCY, "Frequency too short");
-        require(_paymentFrequency <= MAX_PAYMENT_FREQUENCY, "Frequency too long");
+    ) external whenNotPaused {
+        require(hasRole(COMPANY_ROLE, msg.sender), "Not a company");
+        require(_contributor != address(0), "Invalid address");
         require(bytes(_name).length > 0, "Name required");
-        require(_contributor.code.length == 0, "Contributor cannot be contract");
+        require(_salary > 0, "Invalid salary");
+        require(
+            _paymentFrequency >= MIN_PAYMENT_FREQUENCY && 
+            _paymentFrequency <= MAX_PAYMENT_FREQUENCY, 
+            "Invalid frequency"
+        );
 
         Company storage company = companies[msg.sender];
         require(company.isActive, "Company not active");
-        require(
-            company.contributors[_contributor].salary == 0,
-            "Contributor exists"
-        );
 
-        company.contributors[_contributor] = Contributor({
-            name: _name,
-            salary: _salary,
-            lastPayment: 0,
-            nextPayment: block.timestamp + _paymentFrequency,
-            paymentFrequency: _paymentFrequency,
-            lastProcessedTime: block.timestamp,
-            isActive: true
-        });
+        Contributor storage contributor = company.contributors[_contributor];
+        require(!contributor.isActive, "Already active");
 
-        company.contributorAddresses.push(_contributor);
+        // Set all contributor details
+        contributor.name = _name;
+        contributor.salary = _salary;
+        contributor.paymentFrequency = _paymentFrequency;
+        contributor.nextPayment = block.timestamp + _paymentFrequency;
+        contributor.isActive = true;
+        contributor.lastProcessedTime = block.timestamp;
+
         company.contributorCount++;
-        contributorToCompany[_contributor] = msg.sender;
+        company.contributorAddresses.push(_contributor);
         _grantRole(CONTRIBUTOR_ROLE, _contributor);
 
         emit ContributorAdded(
@@ -324,26 +381,20 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
 
     /**
      * @notice Get company details
-     * @param _company Company address
+     * @param _companyAddress Company address
      */
-    function getCompanyDetails(address _company)
-        external
-        view
-        returns (
-            string memory name,
-            uint256 balance,
-            uint256 contributorCount,
-            bool isActive,
-            address admin
-        )
-    {
-        Company storage company = companies[_company];
+    function getCompanyDetails(address _companyAddress) public view returns (
+        string memory name,
+        uint256 balance,
+        uint256 totalContributors,
+        bool isActive
+    ) {
+        Company storage company = companies[_companyAddress];
         return (
             company.name,
             company.balance,
             company.contributorCount,
-            company.isActive,
-            company.admin
+            company.isActive
         );
     }
 
@@ -364,7 +415,12 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
             uint256 lastProcessedTime
         )
     {
-        Contributor storage contributor = companies[_company].contributors[_contributor];
+        Company storage company = companies[_company];
+        require(company.isActive, "Company not active");
+
+        Contributor storage contributor = company.contributors[_contributor];
+        
+        // Add debug event (using a separate debug function since we can't emit in view functions)
         return (
             contributor.name,
             contributor.salary,
@@ -595,20 +651,18 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
         nonReentrant 
         whenNotPaused 
     {
-        require(hasRole(COMPANY_ROLE, msg.sender), "Not a company");
-        require(amount > 0, "Amount must be > 0");
+        // Get company details
         Company storage company = companies[msg.sender];
-        require(company.isActive, "Company not active");
-        
+        if (!company.isActive) revert CompanyNotActive();
+        if (amount == 0) revert InvalidAmount();
+
         // Transfer USDe from sender to contract
-        usde.safeTransferFrom(msg.sender, address(this), amount);
+        bool success = usde.transferFrom(msg.sender, address(this), amount);
+        if (!success) revert TransferFailed();
+
+        // Update company balance
         company.balance += amount;
-        
-        emit FundsDeposited(
-            msg.sender, 
-            amount,
-            block.timestamp
-        );
+        emit FundsDeposited(msg.sender, amount, block.timestamp);
     }
 
     // Add withdraw function for USDe
@@ -768,5 +822,165 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
     modifier onlyCompanyAdmin(address companyAddress) {
         require(isCompanyAdmin(companyAddress, msg.sender), "Not company admin");
         _;
+    }
+
+    /**
+     * @notice Get all contributor addresses for a company
+     * @param _companyAddress Company address
+     * @return Array of contributor addresses
+     */
+    function getContributorAddresses(address _companyAddress) 
+        public 
+        view 
+        returns (address[] memory) 
+    {
+        Company storage company = companies[_companyAddress];
+        return company.contributorAddresses;
+    }
+
+    function updateContributor(
+        address _contributor,
+        uint256 _newSalary,
+        uint256 _newFrequency
+    ) external whenNotPaused {
+        require(hasRole(COMPANY_ROLE, msg.sender), "Not a company");
+        require(_contributor != address(0), "Invalid address");
+        require(_newSalary > 0, "Invalid salary");
+        require(
+            _newFrequency >= MIN_PAYMENT_FREQUENCY && 
+            _newFrequency <= MAX_PAYMENT_FREQUENCY, 
+            "Invalid frequency"
+        );
+
+        Company storage company = companies[msg.sender];
+        require(company.isActive, "Company not active");
+
+        Contributor storage contributor = company.contributors[_contributor];
+        require(contributor.isActive, "Contributor not active");
+
+        contributor.salary = _newSalary;
+        contributor.paymentFrequency = _newFrequency;
+        contributor.nextPayment = block.timestamp + _newFrequency;
+
+        emit ContributorUpdated(
+            msg.sender,
+            _contributor,
+            _newSalary,
+            _newFrequency
+        );
+    }
+
+    function testAddContributor(
+        address _contributor,
+        string memory _name,
+        uint256 _salary,
+        uint256 _paymentFrequency
+    ) external view returns (bool) {
+        Company storage company = companies[msg.sender];
+        Contributor storage contributor = company.contributors[_contributor];
+        
+        return (
+            bytes(contributor.name).length > 0 &&
+            contributor.salary == _salary &&
+            contributor.paymentFrequency == _paymentFrequency &&
+            contributor.isActive
+        );
+    }
+
+    // Split into smaller functions
+    function getContributorBasicInfo(
+        address _company,
+        address _contributor
+    ) 
+        private 
+        view 
+        returns (
+            string memory name,
+            uint256 salary,
+            bool isActive,
+            bool exists
+        ) 
+    {
+        Company storage company = companies[_company];
+        Contributor storage contributor = company.contributors[_contributor];
+        
+        return (
+            contributor.name,
+            contributor.salary,
+            contributor.isActive,
+            bytes(contributor.name).length > 0
+        );
+    }
+
+    function getContributorPaymentInfo(
+        address _company,
+        address _contributor
+    )
+        private
+        view
+        returns (
+            uint256 paymentFrequency,
+            uint256 nextPayment,
+            uint256 contributorCount
+        )
+    {
+        Company storage company = companies[_company];
+        Contributor storage contributor = company.contributors[_contributor];
+        
+        return (
+            contributor.paymentFrequency,
+            contributor.nextPayment,
+            company.contributorCount
+        );
+    }
+
+    function getContributorRoles(
+        address _company,
+        address _contributor
+    )
+        private
+        view
+        returns (bool isCompanyRole, bool isContributorRole)
+    {
+        return (
+            hasRole(COMPANY_ROLE, _company),
+            hasRole(CONTRIBUTOR_ROLE, _contributor)
+        );
+    }
+
+    // Main debug function that returns a struct
+    function debugContributor(
+        address _company,
+        address _contributor
+    ) external view returns (ContributorDebugInfo memory) {
+        Company storage company = companies[_company];
+        
+        (
+            string memory name,
+            uint256 salary,
+            bool isActive,
+            bool exists
+        ) = getContributorBasicInfo(_company, _contributor);
+        
+        (
+            uint256 paymentFrequency,
+            uint256 nextPayment,
+            uint256 contributorCount
+        ) = getContributorPaymentInfo(_company, _contributor);
+        
+        (bool isCompanyRole, bool isContributorRole) = getContributorRoles(_company, _contributor);
+
+        return ContributorDebugInfo({
+            name: name,
+            salary: salary,
+            isActive: isActive,
+            exists: exists,
+            companyActive: company.isActive,
+            paymentFrequency: paymentFrequency,
+            nextPayment: nextPayment,
+            contributorCount: contributorCount,
+            isCompanyRole: isCompanyRole,
+            isContributorRole: isContributorRole
+        });
     }
 }
