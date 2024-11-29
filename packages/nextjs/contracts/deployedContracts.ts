@@ -2581,7 +2581,7 @@ const deployedContracts = {
             },
             {
               internalType: "string",
-              name: "_name",
+              name: "",
               type: "string",
             },
             {

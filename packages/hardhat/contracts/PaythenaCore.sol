@@ -894,7 +894,7 @@ contract PaythenaCore is ReentrancyGuard, AccessControl, Pausable {
 
     function testAddContributor(
         address _contributor,
-        string memory _name,
+        string memory /* _name */,
         uint256 _salary,
         uint256 _paymentFrequency
     ) external view returns (bool) {
