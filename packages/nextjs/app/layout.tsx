@@ -6,10 +6,13 @@ import { ThemeProvider } from "~~/components/ThemeProvider";
 import "~~/styles/globals.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
-export const metadata = getMetadata({ 
-  title: "Paythena | Web3 Payroll Solutions", 
-  description: "Decentralized payroll management solution for Web3 companies" 
-});
+export const metadata = {
+  title: 'Paythena - Web3 Payroll Solutions',
+  description: 'Decentralized payroll system built on Ethena Protocol',
+  icons: {
+    icon: '/favicon.ico',
+  },
+};
 
 const PaythenaApp = ({ children }: { children: React.ReactNode }) => {
   return (

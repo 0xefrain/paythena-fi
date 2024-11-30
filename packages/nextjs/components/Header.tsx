@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bars3Icon, BugAntIcon } from "@heroicons/react/24/outline";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
@@ -29,6 +29,7 @@ export const Header = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const burgerMenuRef = useRef<HTMLDivElement>(null);
   const { address } = useAccount();
+  const router = useRouter();
   
   // Check if user is already registered as a company
   const { data: companyDetails } = useScaffoldReadContract<"PaythenaCore", string>({
@@ -36,6 +37,13 @@ export const Header = () => {
     functionName: "getCompanyDetails",
     args: [address],
   }) as { data: CompanyDetails | undefined };
+
+  // Add this effect to watch for wallet disconnection
+  useEffect(() => {
+    if (!address) {
+      router.push('/');
+    }
+  }, [address, router]);
 
   const menuLinks: HeaderMenuLink[] = [
     {
@@ -119,11 +127,6 @@ export const Header = () => {
         </ul>
       </div>
       <div className="navbar-end flex-grow mr-4">
-        {address && !companyDetails?.[3] && (
-          <Link href="/register" className="btn btn-primary mr-4">
-            Register Company
-          </Link>
-        )}
         <RainbowKitCustomConnectButton />
         <FaucetButton />
       </div>
