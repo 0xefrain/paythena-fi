@@ -1,7 +1,13 @@
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import { formatEther, parseEther } from "viem";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { notification } from "~~/utils/scaffold-eth";
+
+interface LoanInfo {
+  loanBalance: bigint;
+  creditScore: number;
+  status: number;
+}
 
 export const LoanDashboard = ({ address }: { address: string }) => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -12,11 +18,11 @@ export const LoanDashboard = ({ address }: { address: string }) => {
     contractName: "PaythenaCore",
     functionName: "getLoanInfo",
     args: [address],
-  });
+  }) as { data: LoanInfo };
 
   // Contract write functions
   const { writeContractAsync: requestLoan } = useScaffoldWriteContract("PaythenaLoan");
-  const { writeContractAsync: repayLoan } = useScaffoldWriteContract("PaythenaLoan");
+  useScaffoldWriteContract("PaythenaLoan");
 
   const handleRequestLoan = useCallback(async () => {
     if (!loanAmount) return;
@@ -41,7 +47,7 @@ export const LoanDashboard = ({ address }: { address: string }) => {
     <div className="card bg-base-100 shadow-xl">
       <div className="card-body">
         <h2 className="card-title">Loan Dashboard</h2>
-        
+
         {/* Loan Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-4">
           <div className="stat bg-base-200 rounded-box">
@@ -50,12 +56,10 @@ export const LoanDashboard = ({ address }: { address: string }) => {
               {loanInfo?.loanBalance ? formatEther(loanInfo.loanBalance) : "0"} USDe
             </div>
           </div>
-          
+
           <div className="stat bg-base-200 rounded-box">
             <div className="stat-title">Credit Score</div>
-            <div className="stat-value">
-              {loanInfo?.creditScore?.toString() || "N/A"}
-            </div>
+            <div className="stat-value">{loanInfo?.creditScore?.toString() || "N/A"}</div>
           </div>
 
           <div className="stat bg-base-200 rounded-box">
@@ -80,7 +84,7 @@ export const LoanDashboard = ({ address }: { address: string }) => {
                 placeholder="Enter amount"
                 className="input input-bordered w-full"
                 value={loanAmount}
-                onChange={(e) => setLoanAmount(e.target.value)}
+                onChange={e => setLoanAmount(e.target.value)}
                 disabled={isProcessing}
               />
               <button
@@ -101,22 +105,34 @@ export const LoanDashboard = ({ address }: { address: string }) => {
 // Helper functions
 const getLoanStatusBadgeClass = (status: number | undefined) => {
   switch (status) {
-    case 0: return "badge-neutral"; // None
-    case 1: return "badge-warning"; // Pending
-    case 2: return "badge-success"; // Active
-    case 3: return "badge-error";   // Defaulted
-    case 4: return "badge-info";    // Repaid
-    default: return "badge-neutral";
+    case 0:
+      return "badge-neutral"; // None
+    case 1:
+      return "badge-warning"; // Pending
+    case 2:
+      return "badge-success"; // Active
+    case 3:
+      return "badge-error"; // Defaulted
+    case 4:
+      return "badge-info"; // Repaid
+    default:
+      return "badge-neutral";
   }
 };
 
 const formatLoanStatus = (status: number | undefined) => {
   switch (status) {
-    case 0: return "No Loan";
-    case 1: return "Pending";
-    case 2: return "Active";
-    case 3: return "Defaulted";
-    case 4: return "Repaid";
-    default: return "Unknown";
+    case 0:
+      return "No Loan";
+    case 1:
+      return "Pending";
+    case 2:
+      return "Active";
+    case 3:
+      return "Defaulted";
+    case 4:
+      return "Repaid";
+    default:
+      return "Unknown";
   }
-}; 
+};

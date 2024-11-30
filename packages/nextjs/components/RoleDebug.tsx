@@ -42,12 +42,12 @@ export const RoleDebug = () => {
       <h3 className="text-sm font-bold mb-2">Role Debug</h3>
       <div className="text-xs space-y-1">
         <p>Address: {address}</p>
-        <p>Company Role: {companyRole}</p>
-        <p>Contributor Role: {contributorRole}</p>
+        <p>Company Role: {companyRole as string}</p>
+        <p>Contributor Role: {contributorRole as string}</p>
         <p>Is Company: {isCompany?.toString()}</p>
         <p>Is Contributor: {isContributor?.toString()}</p>
-        <p>Contributor Company: {contributorCompany}</p>
+        <p>Contributor Company: {contributorCompany as string}</p>
       </div>
     </div>
   );
-}; 
+};

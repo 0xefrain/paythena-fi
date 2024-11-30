@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { useAccount } from "wagmi";
-import { parseEther, getAddress } from "viem";
+import { useEffect, useState } from "react";
+import { getAddress, parseEther } from "viem";
 import { isAddress } from "viem";
-import { useScaffoldWriteContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useAccount } from "wagmi";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { notification } from "~~/utils/scaffold-eth";
 
 interface AddContributorModalProps {
@@ -11,13 +11,20 @@ interface AddContributorModalProps {
   onSuccess: () => Promise<void>;
 }
 
+interface CompanyDetailsResponse {
+  0: string; // name
+  1: bigint; // balance
+  2: bigint; // contributorCount
+  3: boolean; // isActive
+}
+
 export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContributorModalProps) => {
   const { address: companyAddress } = useAccount();
   const [isCompanyRegistered, setIsCompanyRegistered] = useState(false);
   const [contributorAddress, setContributorAddress] = useState("");
   const [contributorName, setContributorName] = useState("");
   const [salary, setSalary] = useState("");
-  const [timeUnit, setTimeUnit] = useState<'minutes' | 'days'>('minutes');
+  const [] = useState<"minutes" | "days">("minutes");
   const [paymentFrequency, setPaymentFrequency] = useState("86400"); // 1 day in seconds
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -34,7 +41,6 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
     contractName: "PaythenaCore",
     functionName: "hasRole",
     args: [companyRole, companyAddress],
-    enabled: !!companyRole && !!companyAddress,
   });
 
   // Get company details
@@ -42,11 +48,11 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
     contractName: "PaythenaCore",
     functionName: "getCompanyDetails",
     args: [companyAddress],
-    enabled: !!companyAddress,
-  });
+  }) as { data: CompanyDetailsResponse };
 
   useEffect(() => {
-    if (hasCompanyRole && companyDetails?.[3]) { // isActive check
+    if (hasCompanyRole && companyDetails?.[3]) {
+      // isActive check
       setIsCompanyRegistered(true);
     } else {
       setIsCompanyRegistered(false);
@@ -60,7 +66,7 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
       companyRole,
       hasCompanyRole,
       companyDetails,
-      isCompanyRegistered
+      isCompanyRegistered,
     });
   }, [companyAddress, companyRole, hasCompanyRole, companyDetails, isCompanyRegistered]);
 
@@ -74,7 +80,12 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    let formattedAddress = "";
+    let formattedName = "";
+    let formattedSalary = BigInt(0);
+    let formattedFrequency = BigInt(0);
+
     try {
       // Log all parameters before submission
       console.log("Submission Parameters:", {
@@ -84,7 +95,7 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
         salary,
         paymentFrequency,
         isCompanyRegistered,
-        hasCompanyRole
+        hasCompanyRole,
       });
 
       // Check if company is registered
@@ -117,45 +128,40 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
       setIsProcessing(true);
 
       // Format parameters
-      const formattedAddress = getAddress(contributorAddress);
-      const formattedName = contributorName.trim();
-      const formattedSalary = parseEther(salary);
-      const formattedFrequency = BigInt(paymentFrequency);
+      formattedAddress = getAddress(contributorAddress);
+      formattedName = contributorName.trim();
+      formattedSalary = parseEther(salary);
+      formattedFrequency = BigInt(paymentFrequency);
 
       // Log formatted parameters
       console.log("Formatted Parameters:", {
         formattedAddress,
         formattedName,
         formattedSalary: formattedSalary.toString(),
-        formattedFrequency: formattedFrequency.toString()
+        formattedFrequency: formattedFrequency.toString(),
       });
 
       // Call contract with explicit types
       const tx = await addContributor({
         functionName: "addContributor",
-        args: [
-          formattedAddress as `0x${string}`,
-          formattedName,
-          formattedSalary,
-          formattedFrequency,
-        ] as const,
+        args: [formattedAddress as `0x${string}`, formattedName, formattedSalary, formattedFrequency] as const,
       });
 
       console.log("Transaction:", tx);
 
       // Wait for transaction confirmation
       await new Promise(resolve => setTimeout(resolve, 3000)); // Increased wait time
-      
+
       // Refresh data
       await onSuccess();
-      
+
       // Reset form and close modal
       setContributorAddress("");
       setContributorName("");
       setSalary("");
       setPaymentFrequency("86400");
       onClose();
-      
+
       notification.success("Contributor added successfully!");
     } catch (error: any) {
       console.error("Detailed error:", {
@@ -163,7 +169,7 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
         message: error.message,
         data: error.data,
         code: error.code,
-        stack: error.stack
+        stack: error.stack,
       });
 
       // More specific error handling
@@ -181,8 +187,8 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
             address: formattedAddress,
             name: formattedName,
             salary: formattedSalary?.toString(),
-            frequency: formattedFrequency?.toString()
-          }
+            frequency: formattedFrequency?.toString(),
+          },
         });
       } else {
         notification.error(`Failed to add contributor: ${error.message}`);
@@ -196,7 +202,7 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setContributorAddress(value);
-    
+
     // Real-time validation feedback
     if (value && !value.startsWith("0x")) {
       e.target.setCustomValidity("Address must start with 0x");
@@ -215,9 +221,7 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
       <div className="modal modal-open">
         <div className="modal-box">
           <h3 className="font-bold text-lg text-error">Company Not Registered</h3>
-          <p className="py-4">
-            Please register your company first to add contributors.
-          </p>
+          <p className="py-4">Please register your company first to add contributors.</p>
           <div className="modal-action">
             <button className="btn" onClick={onClose}>
               Close
@@ -260,7 +264,7 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
                 placeholder="Enter name"
                 className="input input-bordered w-full"
                 value={contributorName}
-                onChange={(e) => setContributorName(e.target.value)}
+                onChange={e => setContributorName(e.target.value)}
                 disabled={isProcessing}
                 required
               />
@@ -276,7 +280,7 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
                 placeholder="Enter amount"
                 className="input input-bordered w-full"
                 value={salary}
-                onChange={(e) => setSalary(e.target.value)}
+                onChange={e => setSalary(e.target.value)}
                 disabled={isProcessing}
                 required
               />
@@ -292,7 +296,7 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
                   placeholder="1"
                   className="input input-bordered w-full"
                   value={Number(paymentFrequency) / 86400} // Convert seconds to days
-                  onChange={(e) => {
+                  onChange={e => {
                     const value = Number(e.target.value);
                     setPaymentFrequency((value * 86400).toString()); // Convert days to seconds
                   }}
@@ -312,12 +316,7 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
           </div>
 
           <div className="modal-action">
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={onClose}
-              disabled={isProcessing}
-            >
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={isProcessing}>
               Cancel
             </button>
             <button
@@ -335,4 +334,4 @@ export const AddContributorModal = ({ isOpen, onClose, onSuccess }: AddContribut
       </div>
     </div>
   );
-}; 
+};

@@ -48,11 +48,11 @@ export const RoleGuard = ({
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
-          <p>You don't have the required role to access this page.</p>
+          <p>You don t have the required role to access this page.</p>
         </div>
       </div>
     );
   }
 
   return <>{children}</>;
-}; 
+};

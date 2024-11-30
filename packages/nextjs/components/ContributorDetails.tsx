@@ -1,1 +1,1 @@
-// ... improved contributor details component 
+// ... improved contributor details component

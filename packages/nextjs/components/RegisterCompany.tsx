@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount } from "wagmi";
 import { useRouter } from "next/navigation";
-import { useScaffoldWriteContract, useScaffoldEventHistory } from "~~/hooks/scaffold-eth";
-import { useCompanyStatus } from "~~/hooks/scaffold-eth/useCompanyStatus";
+import { useAccount } from "wagmi";
+import { useScaffoldEventHistory, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { notification } from "~~/utils/scaffold-eth";
 
 export const RegisterCompany = () => {
@@ -65,14 +64,14 @@ export const RegisterCompany = () => {
                 placeholder="Enter company name"
                 className="input input-bordered w-full"
                 value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
+                onChange={e => setCompanyName(e.target.value)}
                 disabled={isRegistering}
                 required
               />
             </div>
             <div className="card-actions justify-end mt-4">
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className={`btn btn-primary ${isRegistering ? "loading" : ""}`}
                 disabled={isRegistering || !companyName.trim() || !address}
               >

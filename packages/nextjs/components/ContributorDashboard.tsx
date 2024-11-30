@@ -1,9 +1,9 @@
 "use client";
 
-import { useAccount } from "wagmi";
-import { formatEther } from "viem";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { LoanDashboard } from "./LoanDashboard";
+import { formatEther } from "viem";
+import { useAccount } from "wagmi";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
 export const ContributorDashboard = () => {
   const { address } = useAccount();
@@ -56,9 +56,7 @@ export const ContributorDashboard = () => {
           <div className="card-body">
             <h3 className="card-title">Salary</h3>
             <p className="text-2xl font-bold font-mono">{formatEther(salary)} USDe</p>
-            <p className="text-sm opacity-70">
-              Every {Number(paymentFrequency) / 86400} days
-            </p>
+            <p className="text-sm opacity-70">Every {Number(paymentFrequency) / 86400} days</p>
           </div>
         </div>
 
@@ -66,12 +64,8 @@ export const ContributorDashboard = () => {
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
             <h3 className="card-title">Next Payment</h3>
-            <p className="text-2xl font-bold">
-              {new Date(Number(nextPayment) * 1000).toLocaleDateString()}
-            </p>
-            <p className="text-sm opacity-70">
-              {getTimeUntilNextPayment(nextPayment)}
-            </p>
+            <p className="text-2xl font-bold">{new Date(Number(nextPayment) * 1000).toLocaleDateString()}</p>
+            <p className="text-sm opacity-70">{getTimeUntilNextPayment(nextPayment)}</p>
           </div>
         </div>
 
@@ -79,10 +73,7 @@ export const ContributorDashboard = () => {
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
             <h3 className="card-title">Payment History</h3>
-            <PaymentHistory 
-              companyAddress={companyAddress} 
-              contributorAddress={address} 
-            />
+            <PaymentHistory companyAddress={companyAddress} contributorAddress={address} />
           </div>
         </div>
       </div>
@@ -99,11 +90,11 @@ interface PaymentRecord {
   amount: bigint;
 }
 
-const PaymentHistory = ({ 
-  companyAddress, 
-  contributorAddress 
-}: { 
-  companyAddress: string; 
+const PaymentHistory = ({
+  companyAddress,
+  contributorAddress,
+}: {
+  companyAddress: string;
   contributorAddress: string;
 }) => {
   const { data: payments } = useScaffoldReadContract({
@@ -150,4 +141,4 @@ const getTimeUntilNextPayment = (nextPayment: bigint) => {
   const minutes = Math.floor((timeLeft % 3600) / 60);
 
   return `${days}d ${hours}h ${minutes}m`;
-}; 
+};

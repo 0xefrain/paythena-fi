@@ -14,13 +14,11 @@ export const AccessControl = ({ children }: { children: React.ReactNode }) => {
   const { data: companyRole } = useScaffoldReadContract({
     contractName: "PaythenaCore",
     functionName: "COMPANY_ROLE",
-    enabled: isConnected,
   });
 
   const { data: contributorRole } = useScaffoldReadContract({
     contractName: "PaythenaCore",
     functionName: "CONTRIBUTOR_ROLE",
-    enabled: isConnected,
   });
 
   // Check roles
@@ -28,14 +26,12 @@ export const AccessControl = ({ children }: { children: React.ReactNode }) => {
     contractName: "PaythenaCore",
     functionName: "hasRole",
     args: [companyRole, address],
-    enabled: isConnected && !!companyRole && !!address,
   });
 
   const { data: isContributor } = useScaffoldReadContract({
     contractName: "PaythenaCore",
     functionName: "hasRole",
     args: [contributorRole, address],
-    enabled: isConnected && !!contributorRole && !!address,
   });
 
   // Handle initial wallet connection
@@ -52,7 +48,7 @@ export const AccessControl = ({ children }: { children: React.ReactNode }) => {
       isConnected,
       isCompany,
       isContributor,
-      address
+      address,
     });
 
     if (!isConnected || !address) return;
@@ -88,8 +84,7 @@ export const AccessControl = ({ children }: { children: React.ReactNode }) => {
       notification.info("Please register first");
       window.location.href = "/register";
     }
-
   }, [isConnected, isCompany, isContributor, pathname, address]);
 
   return <>{children}</>;
-}; 
+};

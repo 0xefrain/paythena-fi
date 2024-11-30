@@ -1,15 +1,14 @@
 "use client";
 
-import React, { useCallback, useRef, useState, useEffect } from "react";
-import Image from "next/image";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bars3Icon, BugAntIcon } from "@heroicons/react/24/outline";
+import { useAccount } from "wagmi";
+import { Bars3Icon } from "@heroicons/react/24/outline";
+import { PaythenaLogo } from "~~/components/PaythenaLogo";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
-import { useAccount } from "wagmi";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { PaythenaLogo } from "~~/components/PaythenaLogo";
 
 type HeaderMenuLink = {
   label: string;
@@ -19,10 +18,10 @@ type HeaderMenuLink = {
 };
 
 interface CompanyDetails {
-  0: string;    // name
-  1: bigint;    // balance
-  2: bigint;    // contributors count
-  3: boolean;   // isActive
+  0: string; // name
+  1: bigint; // balance
+  2: bigint; // contributors count
+  3: boolean; // isActive
 }
 
 export const Header = () => {
@@ -30,7 +29,7 @@ export const Header = () => {
   const burgerMenuRef = useRef<HTMLDivElement>(null);
   const { address } = useAccount();
   const router = useRouter();
-  
+
   // Check if user is already registered as a company
   const { data: companyDetails } = useScaffoldReadContract<"PaythenaCore", string>({
     contractName: "PaythenaCore",
@@ -41,7 +40,7 @@ export const Header = () => {
   // Add this effect to watch for wallet disconnection
   useEffect(() => {
     if (!address) {
-      router.push('/');
+      router.push("/");
     }
   }, [address, router]);
 
@@ -130,54 +129,6 @@ export const Header = () => {
         <RainbowKitCustomConnectButton />
         <FaucetButton />
       </div>
-    </div>
-  );
-};
-
-const Navigation = () => {
-  const { address } = useAccount();
-  
-  // Get roles
-  const { data: companyRole } = useScaffoldReadContract({
-    contractName: "PaythenaCore",
-    functionName: "COMPANY_ROLE",
-  });
-
-  const { data: contributorRole } = useScaffoldReadContract({
-    contractName: "PaythenaCore",
-    functionName: "CONTRIBUTOR_ROLE",
-  });
-
-  // Check roles
-  const { data: isCompany } = useScaffoldReadContract({
-    contractName: "PaythenaCore",
-    functionName: "hasRole",
-    args: [companyRole, address],
-  });
-
-  const { data: isContributor } = useScaffoldReadContract({
-    contractName: "PaythenaCore",
-    functionName: "hasRole",
-    args: [contributorRole, address],
-  });
-
-  return (
-    <div className="flex gap-2">
-      {isCompany && (
-        <Link href="/company" className="btn btn-sm btn-ghost">
-          Company Dashboard
-        </Link>
-      )}
-      {isContributor && (
-        <Link href="/contributor" className="btn btn-sm btn-ghost">
-          Contributor Dashboard
-        </Link>
-      )}
-      {!isCompany && !isContributor && (
-        <Link href="/register" className="btn btn-sm btn-primary">
-          Register Company
-        </Link>
-      )}
     </div>
   );
 };

@@ -1,7 +1,22 @@
 import { useScaffoldReadContract } from "./useScaffoldReadContract";
 import { ContributorInfo, CompanyDetails, PaymentRecord } from "~~/types/paythena";
 
-export const usePaythenaData = (companyAddress: string, contributorAddress?: string) => {
+interface ContributorDetail {
+  nextPayment: bigint;
+  isActive: boolean;
+  salary: bigint;
+  name: string;
+  lastProcessedTime: bigint;
+}
+
+interface PaythenaDataReturn {
+  companyDetails: CompanyDetails;
+  contributors: string[];
+  contributorDetails: ContributorDetail;
+  refreshData: () => Promise<void>;
+}
+
+export const usePaythenaData = (companyAddress: string, contributorAddress?: string): PaythenaDataReturn => {
   // Get company details
   const { data: rawCompanyDetails, refetch: refetchCompany } = useScaffoldReadContract({
     contractName: "PaythenaCore",
@@ -29,13 +44,11 @@ export const usePaythenaData = (companyAddress: string, contributorAddress?: str
   });
 
   // Get contributor details if one is selected
-  const { data: contributorDetails, refetch: refetchContributor } = useScaffoldReadContract({
+  const { data: contributorDetails } = useScaffoldReadContract({
     contractName: "PaythenaCore",
     functionName: "getContributorDetails",
     args: [companyAddress, contributorAddress],
-    enabled: !!companyAddress && !!contributorAddress && !!contributors?.includes(contributorAddress),
-    watch: true,
-  });
+  }) as { data: ContributorDetail };
 
   // Debug logging
   console.log("PaythenaData:", {

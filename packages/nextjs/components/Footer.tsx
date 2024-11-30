@@ -1,5 +1,3 @@
-import { PaythenaLogo } from "./PaythenaLogo";
-
 export const Footer = () => {
   return (
     <footer className="min-h-0 p-5 bg-base-200">

@@ -14,18 +14,18 @@ export default function Register() {
           <div className="flex flex-col items-center text-center">
             {/* Icon */}
             <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="h-10 w-10 text-primary" 
-                fill="none" 
-                viewBox="0 0 24 24" 
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-10 w-10 text-primary"
+                fill="none"
+                viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" 
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
                 />
               </svg>
             </div>
@@ -38,13 +38,14 @@ export default function Register() {
             {/* Description */}
             <div className="prose prose-sm mb-6">
               <p className="text-base-content/80">
-                Start managing your payroll on the blockchain. Connect your wallet to register your company and add contributors.
+                Start managing your payroll on the blockchain. Connect your wallet to register your company and add
+                contributors.
               </p>
             </div>
 
             {/* Benefits */}
             <div className="bg-base-200 rounded-lg p-4 mb-6 w-full">
-              <h3 className="font-semibold mb-2">What You'll Get:</h3>
+              <h3 className="font-semibold mb-2">What You ll Get:</h3>
               <ul className="text-sm text-left space-y-2">
                 <li className="flex items-center gap-2">
                   <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -69,23 +70,18 @@ export default function Register() {
 
             {/* Actions */}
             <div className="flex gap-4">
-              <button 
+              <button
                 className="btn btn-primary btn-wide"
                 onClick={() => document.getElementById("wallet-btn")?.click()}
               >
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  className="h-5 w-5 mr-2" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  fill="none"
+                  viewBox="0 0 24 24"
                   stroke="currentColor"
                 >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M13 10V3L4 14h7v7l9-11h-7z" 
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 Connect Wallet
               </button>
@@ -114,7 +110,9 @@ export default function Register() {
             <div className="text-sm breadcrumbs">
               <ul>
                 <li>
-                  <Link href="/" className="text-primary">Home</Link>
+                  <Link href="/" className="text-primary">
+                    Home
+                  </Link>
                 </li>
                 <li>Register Company</li>
               </ul>

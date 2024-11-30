@@ -1,38 +1,51 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { readContract } from '@wagmi/core';
+import { useCallback, useEffect, useState } from "react";
 import { AddContributorModal } from "./modals/AddContributorModal";
-import { formatEther, parseEther } from "viem";
-import { useAccount } from "wagmi";
-import { usePaythenaData } from "~~/hooks/scaffold-eth/usePaythenaData";
-import { ContributorInfo, CompanyDetails, PaymentRecord } from "~~/types/paythena";
-import { useScaffoldWriteContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { notification } from "~~/utils/scaffold-eth";
-import { useWalletState } from "~~/hooks/useWalletState";
+import { formatEther } from "viem";
+// eslint-disable-next-line prettier/prettier
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { usePaythenaData } from "~~/hooks/scaffold-eth/usePaythenaData";
 import { useContributorDetails } from "~~/hooks/useContributorDetails";
+import { useWalletState } from "~~/hooks/useWalletState";
+import { CompanyDetails } from "~~/types/paythena";
+import { notification } from "~~/utils/scaffold-eth";
 
 const copyToClipboard = (text: string) => {
-  navigator.clipboard.writeText(text)
+  navigator.clipboard
+    .writeText(text)
     .then(() => notification.success("Address copied to clipboard!"))
     .catch(() => notification.error("Failed to copy address"));
 };
+
+interface ContributorDetail {
+  nextPayment: bigint;
+  isActive: boolean;
+  salary: bigint;
+  name: string;
+  lastProcessedTime: bigint;
+}
 
 const CompanyDashboard = () => {
   const { address, isLoading, isDisconnected, hasLastSession } = useWalletState();
   const [selectedContributor, setSelectedContributor] = useState<string>("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [depositAmount, setDepositAmount] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [] = useState("");
+  const [, setIsProcessing] = useState(false);
 
   // Use shared data hook with null check for address
-  const { 
-    companyDetails, 
-    contributors = [], 
-    contributorDetails, 
-    refreshData 
-  } = usePaythenaData(address || "", selectedContributor);
+  const {
+    companyDetails,
+    contributors = [],
+    contributorDetails,
+    refreshData,
+  } = usePaythenaData(address || "", selectedContributor) as {
+    companyDetails: CompanyDetails;
+    contributors: string[];
+    contributorDetails: ContributorDetail;
+    refreshData: () => Promise<void>;
+  };
 
   // Debug log to check what we're getting
   console.log("Dashboard render:", {
@@ -43,90 +56,15 @@ const CompanyDashboard = () => {
   });
 
   // Contract write functions - move inside component
-  const { writeContractAsync: deposit } = useScaffoldWriteContract("PaythenaCore");
-  const { writeContractAsync: processPayroll } = useScaffoldWriteContract("PaythenaCore");
+  useScaffoldWriteContract("PaythenaCore");
+  useScaffoldWriteContract("PaythenaCore");
   const { writeContractAsync: removeContributor } = useScaffoldWriteContract("PaythenaCore");
-  const { writeContractAsync: faucet } = useScaffoldWriteContract("MockUSDe");
-  const { writeContractAsync: approve } = useScaffoldWriteContract("MockUSDe");
+  useScaffoldWriteContract("MockUSDe");
+  useScaffoldWriteContract("MockUSDe");
 
-  const { data: paythenaContract } = useDeployedContractInfo("PaythenaCore");
+  useDeployedContractInfo("PaythenaCore");
 
   // Memoize handlers to prevent unnecessary re-renders
-  const handleDeposit = useCallback(async () => {
-    if (!deposit || !depositAmount || !paythenaContract) return;
-    
-    setIsProcessing(true);
-    try {
-      const amount = parseEther(depositAmount);
-
-      console.log("Approving tokens...", {
-        spender: paythenaContract.address,
-        amount: amount.toString()
-      });
-
-      // Approve tokens first
-      await approve({
-        functionName: "approve",
-        args: [paythenaContract.address, amount] as const,
-      });
-
-      // Wait a bit for the approval to be mined
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Then deposit
-      await deposit({
-        functionName: "deposit",
-        args: [amount] as const,
-      });
-
-      await refreshData();
-      notification.success("Deposit successful");
-      setDepositAmount("");
-    } catch (error: any) {
-      console.error("Deposit error:", error);
-      if (error.message.includes("InsufficientAllowance")) {
-        notification.error("Please approve token spending first");
-      } else if (error.message.includes("user rejected")) {
-        notification.error("Transaction rejected by user");
-      } else {
-        notification.error("Failed to deposit. Check console for details.");
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [deposit, approve, depositAmount, refreshData, paythenaContract]);
-
-  const handleFaucet = async () => {
-    if (!address) {
-      notification.error("Wallet not connected");
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      await faucet({
-        functionName: "mint",
-        args: [address, parseEther("1000")] as const, // Mint 1000 USDe for testing
-      });
-
-      // Wait for transaction confirmation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      await refreshData();
-      notification.success("Successfully claimed 1000 test USDe!");
-    } catch (error: any) {
-      console.error("Faucet error:", error);
-      if (error.message.includes("user rejected")) {
-        notification.error("Transaction rejected by user");
-      } else if (error.message.includes("insufficient funds")) {
-        notification.error("Insufficient ETH for gas");
-      } else {
-        notification.error("Failed to claim test USDe. Check console for details.");
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   // Early returns with better UX
   if (isLoading) {
@@ -148,20 +86,14 @@ const CompanyDashboard = () => {
           {hasLastSession ? (
             <>
               <p className="mb-4">Please reconnect your wallet to continue.</p>
-              <button 
-                className="btn btn-primary"
-                onClick={() => document.getElementById("wallet-btn")?.click()}
-              >
+              <button className="btn btn-primary" onClick={() => document.getElementById("wallet-btn")?.click()}>
                 Connect Wallet
               </button>
             </>
           ) : (
             <>
               <p className="mb-4">Please connect your wallet to access the dashboard.</p>
-              <button 
-                className="btn btn-primary"
-                onClick={() => document.getElementById("wallet-btn")?.click()}
-              >
+              <button className="btn btn-primary" onClick={() => document.getElementById("wallet-btn")?.click()}>
                 Connect Wallet
               </button>
             </>
@@ -184,58 +116,8 @@ const CompanyDashboard = () => {
   }
 
   // Handle process payroll
-  const handleProcessPayroll = async () => {
-    if (!selectedContributor) {
-      notification.error("Please select a contributor");
-      return;
-    }
-
-    // Get contributor details from the existing data
-    const selectedContributorDetails = contributors.find(c => c === selectedContributor);
-    if (!selectedContributorDetails) {
-      notification.error("Contributor not found");
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      await processPayroll({
-        functionName: "processSalary",
-        args: [selectedContributor] as const,
-      });
-
-      await refreshData();
-      notification.success("Payment processed successfully");
-    } catch (error: any) {
-      console.error("Process payment error:", error);
-      if (error.message.includes("PaymentAlreadyProcessed")) {
-        notification.error("Payment not due yet");
-      } else if (error.message.includes("InsufficientBalance")) {
-        notification.error("Insufficient balance for payment");
-      } else if (error.message.includes("user rejected")) {
-        notification.error("Transaction rejected by user");
-      } else {
-        notification.error("Failed to process payment. Check console for details.");
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   // Add helper function to format time until next payment
-  const getTimeUntilNextPayment = (nextPayment: bigint) => {
-    const now = BigInt(Math.floor(Date.now() / 1000));
-    const timeLeftBigInt = nextPayment - now;
-    const timeLeftNumber = Number(timeLeftBigInt);
-
-    if (timeLeftNumber <= 0) return "Payment Due";
-
-    const days = Math.floor(timeLeftNumber / 86400);
-    const hours = Math.floor((timeLeftNumber % 86400) / 3600);
-    const minutes = Math.floor((timeLeftNumber % 3600) / 60);
-
-    return `${days}d ${hours}h ${minutes}m`;
-  };
 
   // Handle remove contributor
   const handleRemoveContributor = async (contributorAddress: string) => {
@@ -266,43 +148,15 @@ const CompanyDashboard = () => {
   };
 
   // Add helper functions for payment status
-  const getNextPaymentStatus = () => {
-    if (!contributorDetails) return "badge-neutral";
-    
-    const now = BigInt(Math.floor(Date.now() / 1000));
-    const nextPayment = contributorDetails.nextPayment as bigint;
-    
-    if (!nextPayment) return "badge-neutral";
-    if (now >= nextPayment) return "badge-warning";
-    return "badge-success";
-  };
-
-  const getNextPaymentDue = () => {
-    if (!contributorDetails) return "No payments";
-    
-    const nextPayment = contributorDetails.nextPayment as bigint;
-    if (!nextPayment) return "Not scheduled";
-
-    const now = BigInt(Math.floor(Date.now() / 1000));
-    const timeLeft = Number(nextPayment - now);
-
-    if (timeLeft <= 0) return "Payment Due";
-
-    const days = Math.floor(timeLeft / 86400);
-    const hours = Math.floor((timeLeft % 86400) / 3600);
-    const minutes = Math.floor((timeLeft % 3600) / 60);
-
-    return `${days}d ${hours}h ${minutes}m`;
-  };
 
   // Add function to get total pending payments
   const getPendingPayments = () => {
     if (!contributors || !contributorDetails) return 0;
-    
+
     const now = BigInt(Math.floor(Date.now() / 1000));
     let count = 0;
 
-    contributors.forEach(contributor => {
+    contributors.forEach(() => {
       const nextPayment = contributorDetails.nextPayment as bigint;
       if (nextPayment && now >= nextPayment) count++;
     });
@@ -311,64 +165,10 @@ const CompanyDashboard = () => {
   };
 
   // Add function to process all due payments
-  const handleProcessDuePayments = async () => {
-    if (!contributors || getPendingPayments() === 0) return;
-
-    setIsProcessing(true);
-    try {
-      // Process each due payment
-      for (const contributor of contributors) {
-        try {
-          await processPayroll({
-            functionName: "processSalary",
-            args: [contributor] as const,
-          });
-          // Wait a bit between transactions
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (error: any) {
-          if (error.message.includes("PaymentAlreadyProcessed")) {
-            console.log(`Payment not due yet for ${contributor}`);
-            continue;
-          }
-          throw error;
-        }
-      }
-      
-      await refreshData();
-      notification.success("All due payments processed successfully");
-    } catch (error: any) {
-      console.error("Process due payments error:", error);
-      if (error.message.includes("user rejected")) {
-        notification.error("Transaction rejected by user");
-      } else {
-        notification.error("Failed to process due payments. Check console for details.");
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   // Add helper function to check if payment is due
-  const isDue = (details: any) => {
-    const now = BigInt(Math.floor(Date.now() / 1000));
-    return details.isActive && now >= details.nextPayment;
-  };
 
   // Add helper function to get contributor details
-  const getContributorDetails = async (contributor: string) => {
-    try {
-      const { data } = await readContract({
-        address: deployedContract?.address,
-        abi: deployedContract?.abi,
-        functionName: "getContributorDetails",
-        args: [address, contributor],
-      });
-      return data;
-    } catch (error) {
-      console.error("Get contributor details error:", error);
-      return null;
-    }
-  };
 
   // First, add a helper function to get a clear payment overview
   const getPaymentOverview = () => {
@@ -377,28 +177,27 @@ const CompanyDashboard = () => {
         status: "No Contributors",
         class: "badge-neutral",
         count: 0,
-        nextDue: "No payments scheduled"
+        nextDue: "No payments scheduled",
       };
     }
 
     const pendingCount = getPendingPayments();
-    
+
     if (pendingCount > 0) {
       return {
-        status: `${pendingCount} Payment${pendingCount > 1 ? 's' : ''} Due`,
+        status: `${pendingCount} Payment${pendingCount > 1 ? "s" : ""} Due`,
         class: "badge-warning",
         count: pendingCount,
-        nextDue: "Payments ready to process"
+        nextDue: "Payments ready to process",
       };
     }
 
     // Find next scheduled payment
     let earliestPayment: bigint | null = null;
-    contributors.forEach(contributor => {
-      const details = contributorDetails?.find(d => d.address === contributor);
-      if (details?.nextPayment) {
-        if (!earliestPayment || details.nextPayment < earliestPayment) {
-          earliestPayment = details.nextPayment;
+    contributors.forEach(() => {
+      if (contributorDetails?.nextPayment) {
+        if (!earliestPayment || contributorDetails.nextPayment < earliestPayment) {
+          earliestPayment = contributorDetails.nextPayment;
         }
       }
     });
@@ -413,7 +212,7 @@ const CompanyDashboard = () => {
         status: "All Payments Up to Date",
         class: "badge-success",
         count: 0,
-        nextDue: `Next payment in ${days}d ${hours}h`
+        nextDue: `Next payment in ${days}d ${hours}h`,
       };
     }
 
@@ -421,7 +220,7 @@ const CompanyDashboard = () => {
       status: "No Pending Payments",
       class: "badge-success",
       count: 0,
-      nextDue: "All payments processed"
+      nextDue: "All payments processed",
     };
   };
 
@@ -431,9 +230,7 @@ const CompanyDashboard = () => {
       <header className="bg-base-100 rounded-box p-6 shadow-lg">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-primary">
-              {companyDetails.name || "Company Dashboard"}
-            </h1>
+            <h1 className="text-3xl font-bold text-primary">{companyDetails.name || "Company Dashboard"}</h1>
             <div className="text-sm breadcrumbs opacity-70">
               <ul>
                 <li>Dashboard</li>
@@ -441,24 +238,22 @@ const CompanyDashboard = () => {
               </ul>
             </div>
           </div>
-          
+
           {/* Quick Actions */}
           <div className="flex gap-3">
-            <button 
-              className="btn btn-primary btn-sm gap-2"
-              onClick={() => setIsAddModalOpen(true)}
-            >
+            <button className="btn btn-primary btn-sm gap-2" onClick={() => setIsAddModalOpen(true)}>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
               </svg>
               Add Contributor
             </button>
-            <button 
-              className="btn btn-ghost btn-sm"
-              onClick={refreshData}
-            >
+            <button className="btn btn-ghost btn-sm" onClick={refreshData}>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                <path
+                  fillRule="evenodd"
+                  d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                  clipRule="evenodd"
+                />
               </svg>
             </button>
           </div>
@@ -471,14 +266,17 @@ const CompanyDashboard = () => {
         <div className="stats bg-base-100 shadow-lg">
           <div className="stat">
             <div className="stat-title flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" viewBox="0 0 20 20" fill="currentColor">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4 text-primary"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
                 <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" />
               </svg>
               Balance
             </div>
-            <div className="stat-value text-primary">
-              {formatEther(companyDetails.balance)} USDe
-            </div>
+            <div className="stat-value text-primary">{formatEther(companyDetails.balance)} USDe</div>
           </div>
         </div>
 
@@ -486,7 +284,12 @@ const CompanyDashboard = () => {
         <div className="stats bg-base-100 shadow-lg">
           <div className="stat">
             <div className="stat-title flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-secondary" viewBox="0 0 20 20" fill="currentColor">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4 text-secondary"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
                 <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
               </svg>
               Contributors
@@ -499,15 +302,22 @@ const CompanyDashboard = () => {
         <div className="stats bg-base-100 shadow-lg">
           <div className="stat">
             <div className="stat-title flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-accent" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4 text-accent"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+                  clipRule="evenodd"
+                />
               </svg>
               Payment Overview
             </div>
             <div className="stat-value">
-              <span className={`badge ${getPaymentOverview().class}`}>
-                {getPaymentOverview().status}
-              </span>
+              <span className={`badge ${getPaymentOverview().class}`}>{getPaymentOverview().status}</span>
             </div>
           </div>
         </div>
@@ -516,8 +326,17 @@ const CompanyDashboard = () => {
         <div className="stats bg-base-100 shadow-lg">
           <div className="stat">
             <div className="stat-title flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-info" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4 text-info"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z"
+                  clipRule="evenodd"
+                />
               </svg>
               Company Status
             </div>
@@ -536,15 +355,13 @@ const CompanyDashboard = () => {
         <div className="card bg-base-100 shadow-lg">
           <div className="card-body">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="card-title">
-                Contributors ({contributors?.length || 0})
-              </h2>
+              <h2 className="card-title">Contributors ({contributors?.length || 0})</h2>
               <div className="flex gap-2">
                 <div className="join">
-                  <input 
-                    type="text" 
-                    placeholder="Search contributors..." 
-                    className="input input-bordered input-sm join-item" 
+                  <input
+                    type="text"
+                    placeholder="Search contributors..."
+                    className="input input-bordered input-sm join-item"
                   />
                   <button className="btn btn-sm join-item">Search</button>
                 </div>
@@ -566,7 +383,7 @@ const CompanyDashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {contributors.map((contributor) => (
+                    {contributors.map(contributor => (
                       <ContributorDetails
                         key={contributor}
                         address={address}
@@ -583,10 +400,7 @@ const CompanyDashboard = () => {
               ) : (
                 <div className="text-center py-4">
                   <p className="text-base-content/70">No contributors found</p>
-                  <button 
-                    className="btn btn-primary btn-sm mt-2"
-                    onClick={() => setIsAddModalOpen(true)}
-                  >
+                  <button className="btn btn-primary btn-sm mt-2" onClick={() => setIsAddModalOpen(true)}>
                     Add your first contributor
                   </button>
                 </div>
@@ -597,88 +411,13 @@ const CompanyDashboard = () => {
       </div>
 
       {/* Modals */}
-      <AddContributorModal 
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onSuccess={refreshData}
-      />
+      <AddContributorModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSuccess={refreshData} />
     </div>
   );
 };
 
-const ContributorOption = ({ 
-  address, 
-  contributor 
-}: { 
-  address: string | undefined;
-  contributor: string;
-}) => {
-  const { data: details } = useScaffoldReadContract({
-    contractName: "PaythenaCore",
-    functionName: "getContributorDetails",
-    args: [address as string, contributor],
-  });
-
-  if (!details) return (
-    <option value={contributor}>
-      {contributor}
-    </option>
-  );
-
-  const [name, salary, nextPayment] = details as any[];
-  const now = BigInt(Math.floor(Date.now() / 1000));
-  const isPaymentDue = nextPayment && now >= nextPayment;
-  
-  return (
-    <option value={contributor}>
-      {name || contributor} {isPaymentDue ? "- Payment Due" : ""}
-    </option>
-  );
-};
-
-const ContributorPaymentInfo = ({
-  address,
-  selectedContributor,
-  getTimeUntilNextPayment,
-}: {
-  address: string | undefined;
-  selectedContributor: string;
-  getTimeUntilNextPayment: (nextPayment: bigint) => string;
-}) => {
-  const { data: details } = useScaffoldReadContract({
-    contractName: "PaythenaCore",
-    functionName: "getContributorDetails",
-    args: [address as string, selectedContributor],
-  });
-
-  if (!details) return null;
-
-  const [name, salary, nextPayment] = details as any[];
-  const now = BigInt(Math.floor(Date.now() / 1000));
-  const isPaymentDue = nextPayment && now >= nextPayment;
-
-  return (
-    <>
-      <div className="flex justify-between items-center">
-        <span>Next Payment:</span>
-        <span className={isPaymentDue ? "text-warning" : ""}>
-          {getTimeUntilNextPayment(nextPayment)}
-        </span>
-      </div>
-      <div className="flex justify-between items-center">
-        <span>Amount:</span>
-        <span>{formatEther(salary)} USDe</span>
-      </div>
-    </>
-  );
-};
-
 // Create a separate component for payment countdown
-const PaymentCountdown = ({
-  nextPayment,
-}: {
-  nextPayment: bigint | undefined;
-}) => {
+const PaymentCountdown = ({ nextPayment }: { nextPayment: bigint | undefined }) => {
   const [timeToNextPayment, setTimeToNextPayment] = useState<string>("");
 
   useEffect(() => {
@@ -686,7 +425,7 @@ const PaymentCountdown = ({
       if (nextPayment) {
         const now = BigInt(Math.floor(Date.now() / 1000));
         const timeLeft = Number(nextPayment - now);
-        
+
         if (timeLeft <= 0) {
           setTimeToNextPayment("Payment Due");
         } else {
@@ -723,9 +462,7 @@ const ContributorBalanceMonitor = ({
   useEffect(() => {
     const balance = contributorBalance ? BigInt(contributorBalance.toString()) : BigInt(0);
     if (balance > lastCheckedBalance) {
-      notification.success(
-        `Payment received: ${formatEther(balance - lastCheckedBalance)} USDe`
-      );
+      notification.success(`Payment received: ${formatEther(balance - lastCheckedBalance)} USDe`);
       setLastCheckedBalance(balance);
     }
   }, [contributorBalance, lastCheckedBalance]);
@@ -761,7 +498,7 @@ const ContributorDetails = ({
   companyDetails: CompanyDetails;
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded] = useState(false);
 
   // Add contract write hook
   const { writeContractAsync: processPayroll } = useScaffoldWriteContract("PaythenaCore");
@@ -838,7 +575,16 @@ const ContributorDetails = ({
     } finally {
       setIsProcessing(false);
     }
-  }, [canProcessPayment, processPayroll, contributorAddress, refreshData, companyDetails?.balance, details?.salary, isDue, getTimeUntilNextPayment]);
+  }, [
+    canProcessPayment,
+    processPayroll,
+    contributorAddress,
+    refreshData,
+    companyDetails?.balance,
+    details?.salary,
+    isDue,
+    getTimeUntilNextPayment,
+  ]);
 
   const handleRemove = useCallback(async () => {
     // Add confirmation dialog with null check for details
@@ -867,7 +613,7 @@ const ContributorDetails = ({
 
   const getPaymentStatus = () => {
     const now = BigInt(Math.floor(Date.now() / 1000));
-    
+
     if (!details.isActive) return { text: "Inactive", class: "badge-error" };
     if (now >= details.nextPayment) return { text: "Payment Due", class: "badge-warning" };
     if (details.lastProcessedTime === BigInt(0)) return { text: "Never Paid", class: "badge-warning" };
@@ -884,40 +630,29 @@ const ContributorDetails = ({
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) {
-      return 'Today at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return "Today at " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     } else if (diffDays === 1) {
-      return 'Yesterday at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return "Yesterday at " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     } else if (diffDays < 7) {
       return `${diffDays} days ago`;
     } else {
       return date.toLocaleDateString([], {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
+        year: "numeric",
+        month: "short",
+        day: "numeric",
       });
     }
   };
 
   // Add function to get latest payment
-  const getLatestPayment = () => {
-    if (!paymentHistory || !Array.isArray(paymentHistory) || paymentHistory.length === 0) {
-      return null;
-    }
-
-    // Sort payments by timestamp in descending order
-    const sortedPayments = [...paymentHistory].sort((a, b) => 
-      Number(b.timestamp) - Number(a.timestamp)
-    );
-
-    return sortedPayments[0];
-  };
 
   // Get latest payment
-  const latestPayment = getLatestPayment();
 
   return (
     <>
-      <tr className={`hover:bg-base-200 transition-colors ${selectedContributor === contributorAddress ? "bg-primary/5" : ""}`}>
+      <tr
+        className={`hover:bg-base-200 transition-colors ${selectedContributor === contributorAddress ? "bg-primary/5" : ""}`}
+      >
         <td>
           <input
             type="radio"
@@ -930,20 +665,13 @@ const ContributorDetails = ({
           <div className="flex flex-col gap-1">
             <span className="font-medium">{details?.name || contributorAddress}</span>
             <div className="flex items-center gap-2">
-              <span className="text-xs opacity-60 truncate max-w-[150px]">
-                {contributorAddress}
-              </span>
+              <span className="text-xs opacity-60 truncate max-w-[150px]">{contributorAddress}</span>
               <button
                 className="btn btn-ghost btn-xs"
                 onClick={() => copyToClipboard(contributorAddress)}
                 title="Copy address"
               >
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  className="h-4 w-4" 
-                  viewBox="0 0 20 20" 
-                  fill="currentColor"
-                >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
                   <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
                 </svg>
@@ -954,33 +682,23 @@ const ContributorDetails = ({
         <td>
           <div className="flex flex-col">
             <span className="font-mono">{formatEther(details?.salary || BigInt(0))} USDe</span>
-            <span className="text-xs opacity-60">
-              Every {Number(details?.paymentFrequency || 0) / 86400} days
-            </span>
+            <span className="text-xs opacity-60">Every {Number(details?.paymentFrequency || 0) / 86400} days</span>
           </div>
         </td>
         <td>
           <div className="flex flex-col gap-2">
             {/* Payment Status */}
             <div className="flex items-center gap-2">
-              <span className={`badge badge-sm ${status.class}`}>
-                {status.text}
-              </span>
-              {isDue() && (
-                <span className="badge badge-sm badge-warning">Payment Due</span>
-              )}
+              <span className={`badge badge-sm ${status.class}`}>{status.text}</span>
+              {isDue() && <span className="badge badge-sm badge-warning">Payment Due</span>}
             </div>
 
             {/* Payment Timing */}
             <div className="text-xs">
               {isDue() ? (
-                <span className="text-warning font-medium">
-                  Payment is ready to process
-                </span>
+                <span className="text-warning font-medium">Payment is ready to process</span>
               ) : (
-                <span>
-                  Next payment in: {getTimeUntilNextPayment()}
-                </span>
+                <span>Next payment in: {getTimeUntilNextPayment()}</span>
               )}
             </div>
 
@@ -997,8 +715,17 @@ const ContributorDetails = ({
                       <span>Processing...</span>
                     ) : (
                       <>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 1h6v2H7V6zm6 7H7v2h6v-2z" clipRule="evenodd" />
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M4 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 1h6v2H7V6zm6 7H7v2h6v-2z"
+                            clipRule="evenodd"
+                          />
                         </svg>
                         <span>Process Payment</span>
                       </>
@@ -1007,9 +734,7 @@ const ContributorDetails = ({
                 </button>
               ) : (
                 <div className="tooltip" data-tip={`Next payment in ${getTimeUntilNextPayment()}`}>
-                  <button className="btn btn-sm btn-disabled opacity-50">
-                    Scheduled
-                  </button>
+                  <button className="btn btn-sm btn-disabled opacity-50">Scheduled</button>
                 </div>
               )}
             </div>
@@ -1018,16 +743,18 @@ const ContributorDetails = ({
             {!canProcessPayment() && isDue() && (
               <div className="text-error text-xs flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
                 </svg>
                 <span>Insufficient balance for payment</span>
               </div>
             )}
 
             {/* Payment Amount */}
-            <div className="text-xs opacity-70">
-              Amount: {formatEther(details?.salary || BigInt(0))} USDe
-            </div>
+            <div className="text-xs opacity-70">Amount: {formatEther(details?.salary || BigInt(0))} USDe</div>
           </div>
         </td>
         <td>
@@ -1051,16 +778,11 @@ const ContributorDetails = ({
             </button>
           </div>
           {!canProcessPayment() && isDue() && (
-            <div className="text-error text-xs mt-1">
-              Insufficient balance for payment
-            </div>
+            <div className="text-error text-xs mt-1">Insufficient balance for payment</div>
           )}
         </td>
         <td>
-          <ContributorBalanceMonitor
-            contributorAddress={contributorAddress}
-            nextPayment={details?.nextPayment}
-          />
+          <ContributorBalanceMonitor contributorAddress={contributorAddress} nextPayment={details?.nextPayment} />
         </td>
       </tr>
       {isExpanded && paymentHistory && Array.isArray(paymentHistory) && paymentHistory.length > 0 && (
@@ -1081,7 +803,7 @@ const ContributorDetails = ({
                   <tbody>
                     {[...paymentHistory]
                       .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))
-                      .map((payment, index) => (
+                      .map(payment => (
                         <tr key={payment.paymentId.toString()}>
                           <td>{formatDate(payment.timestamp)}</td>
                           <td className="font-mono">{formatEther(payment.amount)} USDe</td>
@@ -1101,7 +823,7 @@ const ContributorDetails = ({
                             </a>
                           </td>
                         </tr>
-                    ))}
+                      ))}
                   </tbody>
                 </table>
               </div>
