@@ -70,7 +70,7 @@ contract PaythenaAutomation is ReentrancyGuard, AccessControl, Pausable {
             for (uint256 j = 0; j < contributors.length && processedCount < MAX_BATCH_SIZE; j++) {
                 address contributor = contributors[j];
                 if (coreContract.isPaymentDue(company, contributor)) {
-                    try coreContract.processPayment(contributor) {
+                    try coreContract.processSalary(contributor) {
                         processedCount++;
                     } catch {
                         continue;

@@ -8,6 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import "./interfaces/IPaythenaCore.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 /**
  * @title PaythenaLoan
@@ -144,7 +145,6 @@ contract PaythenaLoan is ReentrancyGuard, AccessControl, Pausable {
     ) {
         require(_usde != address(0), "Invalid USDe address");
         require(_core != address(0), "Invalid core address");
-        require(_core.code.length == 0, "Core must be EOA");
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(LOAN_MANAGER_ROLE, msg.sender);
@@ -168,11 +168,7 @@ contract PaythenaLoan is ReentrancyGuard, AccessControl, Pausable {
         nonReentrant 
         whenNotPaused 
     {
-        bytes32 contributorRole = coreContract.CONTRIBUTOR_ROLE();
-        require(
-            coreContract.hasRole(contributorRole, msg.sender),
-            "Not a contributor"
-        );
+        checkRole(msg.sender);
         require(amount > 0, "Invalid amount");
         require(duration <= MAX_LOAN_DURATION, "Duration too long");
         require(bytes(purpose).length > 0, "Purpose required");
@@ -570,5 +566,13 @@ contract PaythenaLoan is ReentrancyGuard, AccessControl, Pausable {
     function _isContributor(address account) internal view returns (bool) {
         bytes32 contributorRole = coreContract.CONTRIBUTOR_ROLE();
         return coreContract.hasRole(contributorRole, account);
+    }
+
+    function checkRole(address account) internal view {
+        bytes32 contributorRole = coreContract.CONTRIBUTOR_ROLE();
+        require(
+            coreContract.hasRole(contributorRole, account),
+            "Not a contributor"
+        );
     }
 }

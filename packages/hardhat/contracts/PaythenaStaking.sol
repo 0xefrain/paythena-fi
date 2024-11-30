@@ -51,7 +51,6 @@ contract PaythenaStaking is ReentrancyGuard, AccessControl, Pausable {
     constructor(address _usde, address _core) {
         require(_usde != address(0), "Invalid USDe address");
         require(_core != address(0), "Invalid core address");
-        require(_core.code.length == 0, "Core must be EOA");
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(STAKING_MANAGER_ROLE, msg.sender);
