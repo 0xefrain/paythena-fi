@@ -43,7 +43,7 @@ export const DisplayVariable = ({
     },
   });
 
-  const { showAnimation } = useAnimationConfig(result);
+  const { isAnimating } = useAnimationConfig(result as number | undefined);
 
   useEffect(() => {
     refetch();
@@ -73,7 +73,7 @@ export const DisplayVariable = ({
         <div>
           <div
             className={`break-all block transition bg-transparent ${
-              showAnimation ? "bg-warning rounded-sm animate-pulse-fast" : ""
+              isAnimating ? "bg-warning rounded-sm animate-pulse-fast" : ""
             }`}
           >
             {displayTxResult(result)}
