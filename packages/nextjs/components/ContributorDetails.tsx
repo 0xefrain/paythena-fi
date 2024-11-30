@@ -1,0 +1,1 @@
+// ... improved contributor details component 

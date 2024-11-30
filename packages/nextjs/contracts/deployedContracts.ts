@@ -1018,17 +1018,7 @@ const deployedContracts = {
         },
         {
           inputs: [],
-          name: "CompanyNotFound",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "ContributorAlreadyExists",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "ContributorNotFound",
+          name: "ContributorNotActive",
           type: "error",
         },
         {
@@ -1048,12 +1038,12 @@ const deployedContracts = {
         },
         {
           inputs: [],
-          name: "InsufficientAllowance",
+          name: "InsufficientBalance",
           type: "error",
         },
         {
           inputs: [],
-          name: "InsufficientBalance",
+          name: "InvalidAddress",
           type: "error",
         },
         {
@@ -1068,12 +1058,12 @@ const deployedContracts = {
         },
         {
           inputs: [],
-          name: "PaymentFailed",
+          name: "InvalidFrequency",
           type: "error",
         },
         {
           inputs: [],
-          name: "PaymentNotDue",
+          name: "PaymentAlreadyProcessed",
           type: "error",
         },
         {
@@ -1094,8 +1084,27 @@ const deployedContracts = {
         },
         {
           inputs: [],
-          name: "TransferFailed",
+          name: "UnauthorizedAccess",
           type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "oldContract",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newContract",
+              type: "address",
+            },
+          ],
+          name: "AutomationContractUpdated",
+          type: "event",
         },
         {
           anonymous: false,
@@ -1152,146 +1161,11 @@ const deployedContracts = {
             {
               indexed: false,
               internalType: "uint256",
-              name: "frequency",
-              type: "uint256",
-            },
-            {
-              indexed: false,
-              internalType: "bool",
-              name: "isActive",
-              type: "bool",
-            },
-            {
-              indexed: false,
-              internalType: "uint256",
-              name: "timestamp",
-              type: "uint256",
-            },
-          ],
-          name: "ContributorAddDebug",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "company",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "contributor",
-              type: "address",
-            },
-            {
-              indexed: false,
-              internalType: "string",
-              name: "name",
-              type: "string",
-            },
-            {
-              indexed: false,
-              internalType: "uint256",
-              name: "salary",
-              type: "uint256",
-            },
-            {
-              indexed: false,
-              internalType: "uint256",
               name: "timestamp",
               type: "uint256",
             },
           ],
           name: "ContributorAdded",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "company",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "contributor",
-              type: "address",
-            },
-            {
-              indexed: false,
-              internalType: "string",
-              name: "name",
-              type: "string",
-            },
-            {
-              indexed: false,
-              internalType: "uint256",
-              name: "salary",
-              type: "uint256",
-            },
-            {
-              indexed: false,
-              internalType: "uint256",
-              name: "frequency",
-              type: "uint256",
-            },
-            {
-              indexed: false,
-              internalType: "bool",
-              name: "isActive",
-              type: "bool",
-            },
-          ],
-          name: "ContributorDebug",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "company",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "contributor",
-              type: "address",
-            },
-            {
-              indexed: false,
-              internalType: "string",
-              name: "name",
-              type: "string",
-            },
-            {
-              indexed: false,
-              internalType: "uint256",
-              name: "salary",
-              type: "uint256",
-            },
-            {
-              indexed: false,
-              internalType: "bool",
-              name: "isActive",
-              type: "bool",
-            },
-            {
-              indexed: false,
-              internalType: "uint256",
-              name: "timestamp",
-              type: "uint256",
-            },
-          ],
-          name: "ContributorGetDebug",
           type: "event",
         },
         {
@@ -1317,37 +1191,6 @@ const deployedContracts = {
             },
           ],
           name: "ContributorRemoved",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "company",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "contributor",
-              type: "address",
-            },
-            {
-              indexed: false,
-              internalType: "uint256",
-              name: "newSalary",
-              type: "uint256",
-            },
-            {
-              indexed: false,
-              internalType: "uint256",
-              name: "newFrequency",
-              type: "uint256",
-            },
-          ],
-          name: "ContributorUpdated",
           type: "event",
         },
         {
@@ -1398,6 +1241,25 @@ const deployedContracts = {
             },
           ],
           name: "FundsWithdrawn",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "IntegrationError",
           type: "event",
         },
         {
@@ -1577,6 +1439,19 @@ const deployedContracts = {
         },
         {
           inputs: [],
+          name: "AUTOMATION_ROLE",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
           name: "COMPANY_ROLE",
           outputs: [
             {
@@ -1616,12 +1491,12 @@ const deployedContracts = {
         },
         {
           inputs: [],
-          name: "MAX_ACTIVE_CONTRIBUTORS",
+          name: "INTEGRATION_ROLE",
           outputs: [
             {
-              internalType: "uint256",
+              internalType: "bytes32",
               name: "",
-              type: "uint256",
+              type: "bytes32",
             },
           ],
           stateMutability: "view",
@@ -1670,22 +1545,22 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
-              name: "_contributor",
+              name: "contributor",
               type: "address",
             },
             {
               internalType: "string",
-              name: "_name",
+              name: "name",
               type: "string",
             },
             {
               internalType: "uint256",
-              name: "_salary",
+              name: "salary",
               type: "uint256",
             },
             {
               internalType: "uint256",
-              name: "_paymentFrequency",
+              name: "paymentFrequency",
               type: "uint256",
             },
           ],
@@ -1695,10 +1570,23 @@ const deployedContracts = {
           type: "function",
         },
         {
+          inputs: [],
+          name: "automationContract",
+          outputs: [
+            {
+              internalType: "contract IPaythenaAutomation",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [
             {
               internalType: "address",
-              name: "_company",
+              name: "company",
               type: "address",
             },
           ],
@@ -1714,28 +1602,22 @@ const deployedContracts = {
           type: "function",
         },
         {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_company",
-              type: "address",
-            },
-          ],
-          name: "checkCompanyBalance",
+          inputs: [],
+          name: "checkIntegrationStatus",
           outputs: [
             {
-              internalType: "uint256",
-              name: "balance",
-              type: "uint256",
-            },
-            {
-              internalType: "uint256",
-              name: "totalPayroll",
-              type: "uint256",
+              internalType: "bool",
+              name: "stakingActive",
+              type: "bool",
             },
             {
               internalType: "bool",
-              name: "isSufficient",
+              name: "loanActive",
+              type: "bool",
+            },
+            {
+              internalType: "bool",
+              name: "automationActive",
               type: "bool",
             },
           ],
@@ -1803,119 +1685,6 @@ const deployedContracts = {
         {
           inputs: [
             {
-              internalType: "address",
-              name: "_company",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "_contributor",
-              type: "address",
-            },
-          ],
-          name: "debugContributor",
-          outputs: [
-            {
-              components: [
-                {
-                  internalType: "string",
-                  name: "name",
-                  type: "string",
-                },
-                {
-                  internalType: "uint256",
-                  name: "salary",
-                  type: "uint256",
-                },
-                {
-                  internalType: "bool",
-                  name: "isActive",
-                  type: "bool",
-                },
-                {
-                  internalType: "bool",
-                  name: "exists",
-                  type: "bool",
-                },
-                {
-                  internalType: "bool",
-                  name: "companyActive",
-                  type: "bool",
-                },
-                {
-                  internalType: "uint256",
-                  name: "paymentFrequency",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "nextPayment",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "lastPayment",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "contributorCount",
-                  type: "uint256",
-                },
-                {
-                  internalType: "bool",
-                  name: "isCompanyRole",
-                  type: "bool",
-                },
-                {
-                  internalType: "bool",
-                  name: "isContributorRole",
-                  type: "bool",
-                },
-                {
-                  components: [
-                    {
-                      internalType: "uint256",
-                      name: "paymentId",
-                      type: "uint256",
-                    },
-                    {
-                      internalType: "bytes32",
-                      name: "txHash",
-                      type: "bytes32",
-                    },
-                    {
-                      internalType: "uint256",
-                      name: "timestamp",
-                      type: "uint256",
-                    },
-                    {
-                      internalType: "uint256",
-                      name: "amount",
-                      type: "uint256",
-                    },
-                    {
-                      internalType: "bool",
-                      name: "processed",
-                      type: "bool",
-                    },
-                  ],
-                  internalType: "struct PaythenaCore.PaymentRecord[]",
-                  name: "recentPayments",
-                  type: "tuple[]",
-                },
-              ],
-              internalType: "struct PaythenaCore.ContributorDebugInfo",
-              name: "info",
-              type: "tuple",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
               internalType: "uint256",
               name: "amount",
               type: "uint256",
@@ -1928,94 +1697,12 @@ const deployedContracts = {
         },
         {
           inputs: [],
-          name: "fundCompany",
-          outputs: [],
-          stateMutability: "payable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "companyAddress",
-              type: "address",
-            },
-          ],
-          name: "getCompanyDashboard",
+          name: "getActiveCompanies",
           outputs: [
             {
-              components: [
-                {
-                  internalType: "string",
-                  name: "name",
-                  type: "string",
-                },
-                {
-                  internalType: "uint256",
-                  name: "totalContributors",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "totalPayroll",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "availableBalance",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "nextPaymentDate",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "stakedAmount",
-                  type: "uint256",
-                },
-                {
-                  internalType: "bool",
-                  name: "isActive",
-                  type: "bool",
-                },
-                {
-                  components: [
-                    {
-                      internalType: "address",
-                      name: "contributorAddress",
-                      type: "address",
-                    },
-                    {
-                      internalType: "string",
-                      name: "name",
-                      type: "string",
-                    },
-                    {
-                      internalType: "uint256",
-                      name: "salary",
-                      type: "uint256",
-                    },
-                    {
-                      internalType: "uint256",
-                      name: "nextPayment",
-                      type: "uint256",
-                    },
-                    {
-                      internalType: "bool",
-                      name: "isActive",
-                      type: "bool",
-                    },
-                  ],
-                  internalType: "struct PaythenaCore.ContributorInfo[]",
-                  name: "activeContributors",
-                  type: "tuple[]",
-                },
-              ],
-              internalType: "struct PaythenaCore.CompanyDashboardData",
+              internalType: "address[]",
               name: "",
-              type: "tuple",
+              type: "address[]",
             },
           ],
           stateMutability: "view",
@@ -2025,7 +1712,54 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
-              name: "_companyAddress",
+              name: "company",
+              type: "address",
+            },
+          ],
+          name: "getActiveContributors",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "getAutomationInfo",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "interval",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "batchSize",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "lastProcessed",
+              type: "uint256",
+            },
+            {
+              internalType: "bool",
+              name: "isActive",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "company",
               type: "address",
             },
           ],
@@ -2043,7 +1777,7 @@ const deployedContracts = {
             },
             {
               internalType: "uint256",
-              name: "totalContributors",
+              name: "contributorCount",
               type: "uint256",
             },
             {
@@ -2051,24 +1785,10 @@ const deployedContracts = {
               name: "isActive",
               type: "bool",
             },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
-          inputs: [
             {
               internalType: "address",
-              name: "_companyAddress",
+              name: "admin",
               type: "address",
-            },
-          ],
-          name: "getContributorAddresses",
-          outputs: [
-            {
-              internalType: "address[]",
-              name: "",
-              type: "address[]",
             },
           ],
           stateMutability: "view",
@@ -2078,100 +1798,12 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
-              name: "contributorAddress",
-              type: "address",
-            },
-          ],
-          name: "getContributorDashboard",
-          outputs: [
-            {
-              components: [
-                {
-                  internalType: "string",
-                  name: "name",
-                  type: "string",
-                },
-                {
-                  internalType: "uint256",
-                  name: "salary",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "nextPayment",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "lastPayment",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "stakedAmount",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "loanBalance",
-                  type: "uint256",
-                },
-                {
-                  internalType: "bool",
-                  name: "isActive",
-                  type: "bool",
-                },
-                {
-                  internalType: "address",
-                  name: "companyAddress",
-                  type: "address",
-                },
-                {
-                  internalType: "string",
-                  name: "companyName",
-                  type: "string",
-                },
-                {
-                  components: [
-                    {
-                      internalType: "uint256",
-                      name: "amount",
-                      type: "uint256",
-                    },
-                    {
-                      internalType: "uint256",
-                      name: "timestamp",
-                      type: "uint256",
-                    },
-                    {
-                      internalType: "string",
-                      name: "description",
-                      type: "string",
-                    },
-                  ],
-                  internalType: "struct PaythenaCore.PaymentHistory[]",
-                  name: "recentPayments",
-                  type: "tuple[]",
-                },
-              ],
-              internalType: "struct PaythenaCore.ContributorDashboardData",
-              name: "",
-              type: "tuple",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_company",
+              name: "company",
               type: "address",
             },
             {
               internalType: "address",
-              name: "_contributor",
+              name: "contributor",
               type: "address",
             },
           ],
@@ -2215,25 +1847,15 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
-              name: "companyAddress",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "contributorAddress",
+              name: "account",
               type: "address",
             },
           ],
-          name: "getNextPaymentInfo",
+          name: "getLoanBalance",
           outputs: [
             {
               internalType: "uint256",
-              name: "nextPayment",
-              type: "uint256",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
+              name: "",
               type: "uint256",
             },
           ],
@@ -2244,48 +1866,26 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
-              name: "_company",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "_contributor",
+              name: "borrower",
               type: "address",
             },
           ],
-          name: "getPaymentHistory",
+          name: "getLoanInfo",
           outputs: [
             {
-              components: [
-                {
-                  internalType: "uint256",
-                  name: "paymentId",
-                  type: "uint256",
-                },
-                {
-                  internalType: "bytes32",
-                  name: "txHash",
-                  type: "bytes32",
-                },
-                {
-                  internalType: "uint256",
-                  name: "timestamp",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "amount",
-                  type: "uint256",
-                },
-                {
-                  internalType: "bool",
-                  name: "processed",
-                  type: "bool",
-                },
-              ],
-              internalType: "struct PaythenaCore.PaymentRecord[]",
-              name: "",
-              type: "tuple[]",
+              internalType: "uint256",
+              name: "loanBalance",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "creditScore",
+              type: "uint256",
+            },
+            {
+              internalType: "enum LoanStatus",
+              name: "status",
+              type: "uint8",
             },
           ],
           stateMutability: "view",
@@ -2314,7 +1914,55 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
-              name: "_company",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "getStakedAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "getStakingInfo",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "stakedAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "pendingRewards",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "currentRate",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "company",
               type: "address",
             },
           ],
@@ -2322,7 +1970,7 @@ const deployedContracts = {
           outputs: [
             {
               internalType: "uint256",
-              name: "total",
+              name: "",
               type: "uint256",
             },
           ],
@@ -2375,40 +2023,16 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
-              name: "companyAddress",
+              name: "company",
               type: "address",
             },
             {
               internalType: "address",
-              name: "caller",
+              name: "contributor",
               type: "address",
             },
           ],
-          name: "isCompanyAdmin",
-          outputs: [
-            {
-              internalType: "bool",
-              name: "",
-              type: "bool",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "companyAddress",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "contributorAddress",
-              type: "address",
-            },
-          ],
-          name: "isContributor",
+          name: "isPaymentDue",
           outputs: [
             {
               internalType: "bool",
@@ -2424,7 +2048,7 @@ const deployedContracts = {
           name: "loanContract",
           outputs: [
             {
-              internalType: "address",
+              internalType: "contract IPaythenaLoan",
               name: "",
               type: "address",
             },
@@ -2455,8 +2079,27 @@ const deployedContracts = {
         {
           inputs: [
             {
+              internalType: "address[]",
+              name: "contributors",
+              type: "address[]",
+            },
+          ],
+          name: "processPaymentBatch",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
               internalType: "address",
-              name: "_contributor",
+              name: "contributor",
               type: "address",
             },
           ],
@@ -2469,7 +2112,7 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "string",
-              name: "_name",
+              name: "name",
               type: "string",
             },
           ],
@@ -2482,7 +2125,7 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
-              name: "contributorAddress",
+              name: "contributor",
               type: "address",
             },
           ],
@@ -2500,7 +2143,7 @@ const deployedContracts = {
             },
             {
               internalType: "address",
-              name: "callerConfirmation",
+              name: "account",
               type: "address",
             },
           ],
@@ -2530,12 +2173,38 @@ const deployedContracts = {
         {
           inputs: [
             {
-              internalType: "bool",
-              name: "status",
-              type: "bool",
+              internalType: "address",
+              name: "_automationContract",
+              type: "address",
             },
           ],
-          name: "setCompanyStatus",
+          name: "setAutomationContract",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_loanContract",
+              type: "address",
+            },
+          ],
+          name: "setLoanContract",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_stakingContract",
+              type: "address",
+            },
+          ],
+          name: "setStakingContract",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -2545,7 +2214,7 @@ const deployedContracts = {
           name: "stakingContract",
           outputs: [
             {
-              internalType: "address",
+              internalType: "contract IPaythenaStaking",
               name: "",
               type: "address",
             },
@@ -2573,83 +2242,8 @@ const deployedContracts = {
           type: "function",
         },
         {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_contributor",
-              type: "address",
-            },
-            {
-              internalType: "string",
-              name: "",
-              type: "string",
-            },
-            {
-              internalType: "uint256",
-              name: "_salary",
-              type: "uint256",
-            },
-            {
-              internalType: "uint256",
-              name: "_paymentFrequency",
-              type: "uint256",
-            },
-          ],
-          name: "testAddContributor",
-          outputs: [
-            {
-              internalType: "bool",
-              name: "",
-              type: "bool",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
           inputs: [],
           name: "unpause",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_contributor",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "_newSalary",
-              type: "uint256",
-            },
-            {
-              internalType: "uint256",
-              name: "_newFrequency",
-              type: "uint256",
-            },
-          ],
-          name: "updateContributor",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_contributor",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "_newNextPayment",
-              type: "uint256",
-            },
-          ],
-          name: "updateNextPayment",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -2682,12 +2276,33 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {
-        DEFAULT_ADMIN_ROLE: "@openzeppelin/contracts/access/AccessControl.sol",
+        AUTOMATION_ROLE: "contracts/interfaces/IPaythenaCore.sol",
+        COMPANY_ROLE: "contracts/interfaces/IPaythenaCore.sol",
+        CONTRIBUTOR_ROLE: "contracts/interfaces/IPaythenaCore.sol",
+        INTEGRATION_ROLE: "contracts/interfaces/IPaythenaCore.sol",
+        addContributor: "contracts/interfaces/IPaythenaCore.sol",
+        canProcessPayment: "contracts/interfaces/IPaythenaCore.sol",
+        deposit: "contracts/interfaces/IPaythenaCore.sol",
+        getActiveCompanies: "contracts/interfaces/IPaythenaCore.sol",
+        getActiveContributors: "contracts/interfaces/IPaythenaCore.sol",
+        getCompanyDetails: "contracts/interfaces/IPaythenaCore.sol",
+        getContributorDetails: "contracts/interfaces/IPaythenaCore.sol",
+        getLoanBalance: "contracts/interfaces/IPaythenaCore.sol",
         getRoleAdmin: "@openzeppelin/contracts/access/AccessControl.sol",
+        getStakedAmount: "contracts/interfaces/IPaythenaCore.sol",
+        getTotalPayroll: "contracts/interfaces/IPaythenaCore.sol",
         grantRole: "@openzeppelin/contracts/access/AccessControl.sol",
         hasRole: "@openzeppelin/contracts/access/AccessControl.sol",
+        isPaymentDue: "contracts/interfaces/IPaythenaCore.sol",
+        processPaymentBatch: "contracts/interfaces/IPaythenaCore.sol",
+        processSalary: "contracts/interfaces/IPaythenaCore.sol",
+        registerCompany: "contracts/interfaces/IPaythenaCore.sol",
+        removeContributor: "contracts/interfaces/IPaythenaCore.sol",
         renounceRole: "@openzeppelin/contracts/access/AccessControl.sol",
         revokeRole: "@openzeppelin/contracts/access/AccessControl.sol",
+        setAutomationContract: "contracts/interfaces/IPaythenaCore.sol",
+        withdraw: "contracts/interfaces/IPaythenaCore.sol",
+        DEFAULT_ADMIN_ROLE: "@openzeppelin/contracts/access/AccessControl.sol",
         supportsInterface: "@openzeppelin/contracts/access/AccessControl.sol",
         paused: "@openzeppelin/contracts/utils/Pausable.sol",
       },

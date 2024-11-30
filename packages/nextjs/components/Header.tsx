@@ -133,3 +133,51 @@ export const Header = () => {
     </div>
   );
 };
+
+const Navigation = () => {
+  const { address } = useAccount();
+  
+  // Get roles
+  const { data: companyRole } = useScaffoldReadContract({
+    contractName: "PaythenaCore",
+    functionName: "COMPANY_ROLE",
+  });
+
+  const { data: contributorRole } = useScaffoldReadContract({
+    contractName: "PaythenaCore",
+    functionName: "CONTRIBUTOR_ROLE",
+  });
+
+  // Check roles
+  const { data: isCompany } = useScaffoldReadContract({
+    contractName: "PaythenaCore",
+    functionName: "hasRole",
+    args: [companyRole, address],
+  });
+
+  const { data: isContributor } = useScaffoldReadContract({
+    contractName: "PaythenaCore",
+    functionName: "hasRole",
+    args: [contributorRole, address],
+  });
+
+  return (
+    <div className="flex gap-2">
+      {isCompany && (
+        <Link href="/company" className="btn btn-sm btn-ghost">
+          Company Dashboard
+        </Link>
+      )}
+      {isContributor && (
+        <Link href="/contributor" className="btn btn-sm btn-ghost">
+          Contributor Dashboard
+        </Link>
+      )}
+      {!isCompany && !isContributor && (
+        <Link href="/register" className="btn btn-sm btn-primary">
+          Register Company
+        </Link>
+      )}
+    </div>
+  );
+};

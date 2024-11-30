@@ -23,7 +23,7 @@ contract PaythenaLoan is ReentrancyGuard, AccessControl, Pausable {
     bytes32 public constant LOAN_MANAGER_ROLE = keccak256("LOAN_MANAGER_ROLE");
     
     // State variables
-    IERC20 public immutable usde;
+    IERC20 public constant USDE = IERC20(0x426E7d03f9803Dd11cb8616C65b99a3c0AfeA6dE);
     IPaythenaCore public immutable coreContract;
 
     // Constants with explicit visibility
@@ -137,19 +137,15 @@ contract PaythenaLoan is ReentrancyGuard, AccessControl, Pausable {
     /**
      * @notice Contract constructor
      * @param _core Address of PaythenaCore contract
-     * @param _usde Address of USDe token
      */
     constructor(
-        address _usde,
         address _core
     ) {
-        require(_usde != address(0), "Invalid USDe address");
         require(_core != address(0), "Invalid core address");
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(LOAN_MANAGER_ROLE, msg.sender);
         
-        usde = IERC20(_usde);
         coreContract = IPaythenaCore(_core);
     }
 
@@ -221,7 +217,7 @@ contract PaythenaLoan is ReentrancyGuard, AccessControl, Pausable {
         });
 
         // Transfer loan amount
-        usde.safeTransfer(borrower, application.requestedAmount);
+        USDE.safeTransfer(borrower, application.requestedAmount);
         
         totalLoansIssued[borrower] += application.requestedAmount;
         delete loanApplications[borrower];
@@ -257,7 +253,7 @@ contract PaythenaLoan is ReentrancyGuard, AccessControl, Pausable {
         require(amount <= totalDue, "Amount exceeds due");
 
         // Transfer payment
-        usde.safeTransferFrom(msg.sender, address(this), amount);
+        USDE.safeTransferFrom(msg.sender, address(this), amount);
         
         loan.remainingAmount -= amount;
         loan.lastPaymentDate = block.timestamp;
@@ -542,7 +538,7 @@ contract PaythenaLoan is ReentrancyGuard, AccessControl, Pausable {
         require(amount > 0, "Invalid amount");
 
         // Transfer payment
-        try usde.transferFrom(borrower, address(this), amount) {
+        try USDE.transferFrom(borrower, address(this), amount) {
             loan.remainingAmount = loan.remainingAmount > amount ? 
                 loan.remainingAmount - amount : 0;
             

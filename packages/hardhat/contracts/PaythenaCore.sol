@@ -38,7 +38,7 @@ contract PaythenaCore is IPaythenaCore, ReentrancyGuard, AccessControl, Pausable
     }
 
     // State variables
-    IERC20 public immutable usde;
+    IERC20 public constant USDE = IERC20(0x426E7d03f9803Dd11cb8616C65b99a3c0AfeA6dE);
     IPaythenaStaking public stakingContract;
     IPaythenaLoan public loanContract;
     IPaythenaAutomation public automationContract;
@@ -77,20 +77,16 @@ contract PaythenaCore is IPaythenaCore, ReentrancyGuard, AccessControl, Pausable
 
     /**
      * @notice Contract constructor
-     * @param _usde Address of USDe token
      * @param _stakingContract Address of staking contract
      * @param _loanContract Address of loan contract
      */
     constructor(
-        address _usde,
         address _stakingContract,
         address _loanContract
     ) {
-        if (_usde == address(0)) revert InvalidAddress();
         if (_stakingContract == address(0)) revert InvalidAddress();
         if (_loanContract == address(0)) revert InvalidAddress();
 
-        usde = IERC20(_usde);
         stakingContract = IPaythenaStaking(_stakingContract);
         loanContract = IPaythenaLoan(_loanContract);
 
@@ -288,7 +284,7 @@ contract PaythenaCore is IPaythenaCore, ReentrancyGuard, AccessControl, Pausable
         });
 
         paymentRecords[msg.sender][contributor].push(record);
-        usde.safeTransfer(contributor, cont.salary);
+        USDE.safeTransfer(contributor, cont.salary);
 
         emit PaymentProcessed(
             paymentId,
@@ -309,7 +305,7 @@ contract PaythenaCore is IPaythenaCore, ReentrancyGuard, AccessControl, Pausable
         if (!company.isActive) revert CompanyNotActive();
 
         company.balance += amount;
-        usde.safeTransferFrom(msg.sender, address(this), amount);
+        USDE.safeTransferFrom(msg.sender, address(this), amount);
         
         emit FundsDeposited(msg.sender, amount, block.timestamp);
     }
@@ -323,7 +319,7 @@ contract PaythenaCore is IPaythenaCore, ReentrancyGuard, AccessControl, Pausable
         if (company.balance < amount) revert InsufficientBalance();
 
         company.balance -= amount;
-        usde.safeTransfer(msg.sender, amount);
+        USDE.safeTransfer(msg.sender, amount);
         
         emit FundsWithdrawn(msg.sender, amount, block.timestamp);
     }

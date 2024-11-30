@@ -1,119 +1,153 @@
-import { formatEther } from "viem";
+"use client";
+
 import { useAccount } from "wagmi";
+import { formatEther } from "viem";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { LoanDashboard } from "./LoanDashboard";
 
-interface CompanyDetails {
-  0: string; // name
-  1: bigint; // balance
-  2: bigint; // contributors count
-  3: boolean; // isActive
-}
+export const ContributorDashboard = () => {
+  const { address } = useAccount();
 
+  // Get company address
+  const { data: companyAddress } = useScaffoldReadContract({
+    contractName: "PaythenaCore",
+    functionName: "contributorToCompany",
+    args: [address],
+  }) as { data: string | undefined };
+
+  // Get contributor details
+  const { data: details } = useScaffoldReadContract({
+    contractName: "PaythenaCore",
+    functionName: "getContributorDetails",
+    args: [companyAddress, address],
+  }) as { data: [string, bigint, bigint, bigint, boolean] | undefined };
+
+  if (!details || !companyAddress || !address) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
+  }
+
+  const [name, salary, nextPayment, paymentFrequency, isActive] = details;
+
+  return (
+    <div className="flex flex-col gap-6 p-6 bg-base-200 min-h-screen">
+      {/* Contributor Header */}
+      <div className="card bg-base-100 shadow-xl">
+        <div className="card-body">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="card-title text-2xl">{name || "Contributor Dashboard"}</h2>
+              <p className="text-sm opacity-70">Company: {companyAddress}</p>
+            </div>
+            <div className={`badge ${isActive ? "badge-success" : "badge-error"}`}>
+              {isActive ? "Active" : "Inactive"}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Salary Card */}
+        <div className="card bg-base-100 shadow-xl">
+          <div className="card-body">
+            <h3 className="card-title">Salary</h3>
+            <p className="text-2xl font-bold font-mono">{formatEther(salary)} USDe</p>
+            <p className="text-sm opacity-70">
+              Every {Number(paymentFrequency) / 86400} days
+            </p>
+          </div>
+        </div>
+
+        {/* Next Payment Card */}
+        <div className="card bg-base-100 shadow-xl">
+          <div className="card-body">
+            <h3 className="card-title">Next Payment</h3>
+            <p className="text-2xl font-bold">
+              {new Date(Number(nextPayment) * 1000).toLocaleDateString()}
+            </p>
+            <p className="text-sm opacity-70">
+              {getTimeUntilNextPayment(nextPayment)}
+            </p>
+          </div>
+        </div>
+
+        {/* Payment History Card */}
+        <div className="card bg-base-100 shadow-xl">
+          <div className="card-body">
+            <h3 className="card-title">Payment History</h3>
+            <PaymentHistory 
+              companyAddress={companyAddress} 
+              contributorAddress={address} 
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Loan Section */}
+      <LoanDashboard address={address as string} />
+    </div>
+  );
+};
+
+// Update PaymentHistory types
 interface PaymentRecord {
   timestamp: bigint;
   amount: bigint;
-  processed: boolean;
-  txHash: string;
 }
 
-// Add this function
-const getTimeUntilPayment = (nextPayment: bigint) => {
+const PaymentHistory = ({ 
+  companyAddress, 
+  contributorAddress 
+}: { 
+  companyAddress: string; 
+  contributorAddress: string;
+}) => {
+  const { data: payments } = useScaffoldReadContract({
+    contractName: "PaythenaCore",
+    functionName: "getPaymentHistory",
+    args: [companyAddress, contributorAddress],
+  }) as { data: PaymentRecord[] | undefined };
+
+  if (!payments || !Array.isArray(payments) || payments.length === 0) {
+    return <p className="text-sm opacity-70">No payment history</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="table table-xs">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {payments.slice(0, 5).map((payment: any, index) => (
+            <tr key={index}>
+              <td>{new Date(Number(payment.timestamp) * 1000).toLocaleDateString()}</td>
+              <td className="font-mono">{formatEther(payment.amount)} USDe</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// Helper function for time until next payment
+const getTimeUntilNextPayment = (nextPayment: bigint) => {
   const now = BigInt(Math.floor(Date.now() / 1000));
   const timeLeft = Number(nextPayment - now);
 
-  if (timeLeft <= 0) return "Payment is due";
+  if (timeLeft <= 0) return "Payment Due";
 
   const days = Math.floor(timeLeft / 86400);
   const hours = Math.floor((timeLeft % 86400) / 3600);
   const minutes = Math.floor((timeLeft % 3600) / 60);
 
   return `${days}d ${hours}h ${minutes}m`;
-};
-
-interface ContributorDashboardProps {
-  contributorDetails: {
-    name: string;
-    salary: bigint;
-    isActive: boolean;
-    exists: boolean;
-    companyAddress: string;
-  };
-}
-
-export const ContributorDashboard = ({ contributorDetails }: ContributorDashboardProps) => {
-  const { address } = useAccount();
-
-  // Get payment history
-  const { data: paymentHistory } = useScaffoldReadContract({
-    contractName: "PaythenaCore",
-    functionName: "getPaymentHistory",
-    args: [contributorDetails.companyAddress, address],
-  }) as { data: PaymentRecord[] | undefined };
-
-  return (
-    <div className="flex flex-col gap-8 p-4">
-      {/* Payment Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="stat bg-base-100 shadow rounded-lg">
-          <div className="stat-title">Status</div>
-          <div className={`stat-value ${contributorDetails.isActive ? "text-success" : "text-error"}`}>
-            {contributorDetails.isActive ? "Active" : "Inactive"}
-          </div>
-          <div className="stat-desc">Contributor Name: {contributorDetails.name}</div>
-        </div>
-
-        <div className="stat bg-base-100 shadow rounded-lg">
-          <div className="stat-title">Current Salary</div>
-          <div className="stat-value">{formatEther(contributorDetails.salary)} USDe</div>
-        </div>
-
-        <div className="stat bg-base-100 shadow rounded-lg">
-          <div className="stat-title">Company</div>
-          <div className="stat-value text-sm">{contributorDetails.companyAddress}</div>
-        </div>
-      </div>
-
-      {/* Payment History */}
-      <div className="card bg-base-100 shadow-xl">
-        <div className="card-body">
-          <h2 className="card-title">Payment History</h2>
-          <div className="overflow-x-auto">
-            <table className="table w-full">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Transaction</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paymentHistory?.map((payment, index) => (
-                  <tr key={index}>
-                    <td>{new Date(Number(payment.timestamp) * 1000).toLocaleDateString()}</td>
-                    <td>{formatEther(payment.amount)} USDe</td>
-                    <td>
-                      <span className={`badge ${payment.processed ? "badge-success" : "badge-warning"}`}>
-                        {payment.processed ? "Processed" : "Pending"}
-                      </span>
-                    </td>
-                    <td>
-                      <a
-                        href={`https://sepolia.etherscan.io/tx/${payment.txHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="link link-primary"
-                      >
-                        View Transaction
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+}; 

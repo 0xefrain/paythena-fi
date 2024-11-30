@@ -5,6 +5,8 @@ import { Header } from "~~/components/Header";
 import { ThemeProvider } from "~~/components/ThemeProvider";
 import "~~/styles/globals.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
+import { ClientLayout } from "~~/components/ClientLayout";
+import { NetworkWarning } from "~~/components/NetworkWarning";
 
 export const metadata = {
   title: 'Paythena - Web3 Payroll Solutions',
@@ -14,19 +16,22 @@ export const metadata = {
   },
 };
 
-const PaythenaApp = ({ children }: { children: React.ReactNode }) => {
+const RootLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <html suppressHydrationWarning>
       <body>
-        <ThemeProvider enableSystem>
+        <ThemeProvider>
           <ScaffoldEthAppWithProviders>
-            <div className="flex flex-col min-h-screen">
-              <Header />
-              <main className="relative flex flex-col flex-1">
-                {children}
-              </main>
-              <Footer />
-            </div>
+            <ClientLayout>
+              <NetworkWarning />
+              <div className="flex flex-col min-h-screen">
+                <Header />
+                <main className="relative flex flex-col flex-1">
+                  {children}
+                </main>
+                <Footer />
+              </div>
+            </ClientLayout>
           </ScaffoldEthAppWithProviders>
         </ThemeProvider>
       </body>
@@ -34,4 +39,4 @@ const PaythenaApp = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export default PaythenaApp;
+export default RootLayout;

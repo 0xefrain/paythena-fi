@@ -25,8 +25,11 @@ contract PaythenaStaking is ReentrancyGuard, AccessControl, Pausable {
     uint256 public constant REWARD_RATE_DENOMINATOR = 10000;
     uint256 public constant MAX_REWARD_RATE = 2000; // 20% maximum annual rate
     
+    // USDe contracts on Ble Testnet
+    IERC20 public constant USDE = IERC20(0x426E7d03f9803Dd11cb8616C65b99a3c0AfeA6dE);
+    IERC20 public constant SUSDE = IERC20(0x80f9Ec4bA5746d8214b3A9a73cc4390AB0F0E633);
+    
     // Immutable state variables
-    IERC20 public immutable usde;
     address public immutable core;
 
     // Staking state
@@ -45,17 +48,14 @@ contract PaythenaStaking is ReentrancyGuard, AccessControl, Pausable {
 
     /**
      * @notice Contract constructor
-     * @param _usde The USDe token contract address
      * @param _core The core contract address
      */
-    constructor(address _usde, address _core) {
-        require(_usde != address(0), "Invalid USDe address");
+    constructor(address _core) {
         require(_core != address(0), "Invalid core address");
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(STAKING_MANAGER_ROLE, msg.sender);
         
-        usde = IERC20(_usde);
         core = _core;
     }
 
@@ -72,7 +72,7 @@ contract PaythenaStaking is ReentrancyGuard, AccessControl, Pausable {
         _updateRewards(msg.sender);
         
         // Transfer tokens from user
-        usde.safeTransferFrom(msg.sender, address(this), amount);
+        USDE.safeTransferFrom(msg.sender, address(this), amount);
         
         // Update balances
         stakedBalance[msg.sender] += amount;
@@ -97,7 +97,7 @@ contract PaythenaStaking is ReentrancyGuard, AccessControl, Pausable {
         totalStaked -= amount;
         
         // Transfer tokens back to user
-        usde.safeTransfer(msg.sender, amount);
+        USDE.safeTransfer(msg.sender, amount);
         
         emit Unstaked(msg.sender, amount, block.timestamp);
     }
@@ -111,7 +111,7 @@ contract PaythenaStaking is ReentrancyGuard, AccessControl, Pausable {
         require(rewards > 0, "No rewards available");
         
         rewardBalance[msg.sender] = 0;
-        usde.safeTransfer(msg.sender, rewards);
+        USDE.safeTransfer(msg.sender, rewards);
         
         emit RewardsClaimed(msg.sender, rewards, block.timestamp);
     }
@@ -126,7 +126,7 @@ contract PaythenaStaking is ReentrancyGuard, AccessControl, Pausable {
         stakedBalance[msg.sender] = 0;
         totalStaked -= amount;
         
-        usde.safeTransfer(msg.sender, amount);
+        USDE.safeTransfer(msg.sender, amount);
         
         emit EmergencyWithdraw(msg.sender, amount, block.timestamp);
     }

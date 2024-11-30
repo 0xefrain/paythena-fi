@@ -1,20 +1,25 @@
+"use client";
+
 import { useEffect, useState } from "react";
 
 const ANIMATION_TIME = 2000;
 
-export function useAnimationConfig(data: any) {
-  const [showAnimation, setShowAnimation] = useState(false);
-  const [prevData, setPrevData] = useState();
+export const useAnimationConfig = (value: number | undefined) => {
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [displayValue, setDisplayValue] = useState(value);
 
   useEffect(() => {
-    if (prevData !== undefined && prevData !== data) {
-      setShowAnimation(true);
-      setTimeout(() => setShowAnimation(false), ANIMATION_TIME);
-    }
-    setPrevData(data);
-  }, [data, prevData]);
+    setIsAnimating(true);
+    const timeout = setTimeout(() => {
+      setDisplayValue(value);
+      setIsAnimating(false);
+    }, ANIMATION_TIME);
+
+    return () => clearTimeout(timeout);
+  }, [value]);
 
   return {
-    showAnimation,
+    isAnimating,
+    displayValue,
   };
-}
+};

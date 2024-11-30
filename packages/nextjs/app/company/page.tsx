@@ -3,31 +3,31 @@
 import Link from "next/link";
 import { useAccount } from "wagmi";
 import { RoleGuard } from "~~/components/guards/RoleGuard";
-import { ContributorDashboard } from "~~/components/ContributorDashboard";
+import CompanyDashboard from "~~/components/Dashboard";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
-export default function ContributorPage() {
+export default function CompanyPage() {
   const { address, isConnected } = useAccount();
 
-  // Get contributor role and check if wallet has it
-  const { data: contributorRole, isLoading: isRoleLoading } = useScaffoldReadContract({
+  // Get company role and check if wallet has it
+  const { data: companyRole, isLoading: isRoleLoading } = useScaffoldReadContract({
     contractName: "PaythenaCore",
-    functionName: "CONTRIBUTOR_ROLE",
+    functionName: "COMPANY_ROLE",
     enabled: isConnected,
   });
 
   const { data: hasRole, isLoading: isHasRoleLoading } = useScaffoldReadContract({
     contractName: "PaythenaCore",
     functionName: "hasRole",
-    args: [contributorRole, address],
-    enabled: isConnected && !!contributorRole && !!address,
+    args: [companyRole, address],
+    enabled: isConnected && !!companyRole && !!address,
   });
 
   // Debug logs
-  console.log("Contributor Page State:", {
+  console.log("Company Page State:", {
     isConnected,
     address,
-    contributorRole,
+    companyRole,
     hasRole,
     isRoleLoading,
     isHasRoleLoading
@@ -39,7 +39,7 @@ export default function ContributorPage() {
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-base-300 to-base-200">
         <div className="card bg-base-100 shadow-2xl p-8 max-w-lg w-full mx-4 border border-base-300">
           <div className="flex flex-col items-center text-center">
-            {/* Contributor Icon */}
+            {/* Company Icon */}
             <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
               <svg 
                 xmlns="http://www.w3.org/2000/svg" 
@@ -52,17 +52,17 @@ export default function ContributorPage() {
                   strokeLinecap="round" 
                   strokeLinejoin="round" 
                   strokeWidth={2} 
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" 
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" 
                 />
               </svg>
             </div>
 
             <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Contributor Dashboard Access
+              Company Dashboard Access
             </h2>
 
             <p className="text-base-content/80 mb-6">
-              Please connect your wallet to access the contributor dashboard.
+              Please connect your wallet to access the company dashboard.
             </p>
 
             <button 
@@ -82,7 +82,7 @@ export default function ContributorPage() {
   }
 
   // Loading state - only show briefly
-  if (isRoleLoading || (isHasRoleLoading && contributorRole)) {
+  if (isRoleLoading || (isHasRoleLoading && companyRole)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <span className="loading loading-spinner loading-lg"></span>
@@ -90,7 +90,7 @@ export default function ContributorPage() {
     );
   }
 
-  // Not registered state - show if we have completed role checks and user is not a contributor
+  // Not registered state - show if we have completed role checks and user is not a company
   if (!hasRole || hasRole === false) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-base-300 to-base-200">
@@ -108,13 +108,16 @@ export default function ContributorPage() {
               </svg>
             </div>
 
-            <h2 className="text-3xl font-bold mb-4">Not a Contributor</h2>
+            <h2 className="text-3xl font-bold mb-4">Not Registered</h2>
             <p className="text-base-content/80 mb-6">
-              This wallet is not registered as a contributor. Please contact your company administrator to be added as a contributor.
+              This wallet is not registered as a company. Please register your company first to access the dashboard.
             </p>
 
             <div className="flex gap-4">
-              <Link href="/" className="btn btn-primary">
+              <Link href="/register" className="btn btn-primary">
+                Register Company
+              </Link>
+              <Link href="/" className="btn btn-ghost">
                 Return Home
               </Link>
             </div>
@@ -126,8 +129,8 @@ export default function ContributorPage() {
 
   // Show dashboard if authorized
   return (
-    <RoleGuard requiredRole="CONTRIBUTOR_ROLE">
-      <ContributorDashboard />
+    <RoleGuard requiredRole="COMPANY_ROLE">
+      <CompanyDashboard />
     </RoleGuard>
   );
-}
+} 

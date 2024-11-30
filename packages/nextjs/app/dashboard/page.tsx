@@ -1,7 +1,21 @@
 "use client";
 
-import Dashboard from "~~/components/Dashboard";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import CompanyDashboard from "~~/components/Dashboard";
+import { useWalletState } from "~~/hooks/useWalletState";
 
-export default function DashboardPage() {
-  return <Dashboard />;
-}
+const DashboardPage = () => {
+  const { isDisconnected, hasLastSession } = useWalletState();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isDisconnected && !hasLastSession) {
+      router.push("/");
+    }
+  }, [isDisconnected, hasLastSession, router]);
+
+  return <CompanyDashboard />;
+};
+
+export default DashboardPage;

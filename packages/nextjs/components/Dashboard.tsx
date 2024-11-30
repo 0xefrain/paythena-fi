@@ -1,770 +1,596 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { readContract } from '@wagmi/core';
 import { AddContributorModal } from "./modals/AddContributorModal";
-import { ConfigureSalaryModal } from "./modals/ConfigureSalaryModal";
 import { formatEther, parseEther } from "viem";
 import { useAccount } from "wagmi";
-import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { usePaythenaData } from "~~/hooks/scaffold-eth/usePaythenaData";
+import { ContributorInfo, CompanyDetails, PaymentRecord } from "~~/types/paythena";
+import { useScaffoldWriteContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { notification } from "~~/utils/scaffold-eth";
-import Link from "next/link";
+import { useWalletState } from "~~/hooks/useWalletState";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { useContributorDetails } from "~~/hooks/useContributorDetails";
 
-interface ContributorDebugInfo {
-  name: string;
-  salary: bigint;
-  isActive: boolean;
-  exists: boolean;
-  companyActive: boolean;
-  paymentFrequency: bigint;
-  nextPayment: bigint;
-  lastPayment: bigint;
-  contributorCount: bigint;
-  isCompanyRole: boolean;
-  isContributorRole: boolean;
-}
-
-interface CompanyDetails {
-  0: string; // name
-  1: bigint; // balance
-  2: bigint; // contributors count
-  3: boolean; // isActive
-}
-
-interface PaymentRecord {
-  paymentId: bigint;
-  txHash: string;
-  timestamp: bigint;
-  amount: bigint;
-  processed: boolean;
-}
-
-const getTimeUntilPayment = (nextPayment: bigint) => {
-  const now = BigInt(Math.floor(Date.now() / 1000));
-  const timeLeft = Number(nextPayment - now);
-
-  if (timeLeft <= 0) return "Payment is due";
-
-  const days = Math.floor(timeLeft / 86400);
-  const hours = Math.floor((timeLeft % 86400) / 3600);
-  const minutes = Math.floor((timeLeft % 3600) / 60);
-
-  return `${days}d ${hours}h ${minutes}m`;
+const copyToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text)
+    .then(() => notification.success("Address copied to clipboard!"))
+    .catch(() => notification.error("Failed to copy address"));
 };
 
-const useRefreshData = (address: string | undefined, selectedContributor: string) => {
-  const { refetch: refetchCompany } = useScaffoldReadContract({
-    contractName: "PaythenaCore",
-    functionName: "getCompanyDetails",
-    args: [address],
+const CompanyDashboard = () => {
+  const { address, isLoading, isDisconnected, hasLastSession } = useWalletState();
+  const [selectedContributor, setSelectedContributor] = useState<string>("");
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Use shared data hook with null check for address
+  const { 
+    companyDetails, 
+    contributors = [], 
+    contributorDetails, 
+    refreshData 
+  } = usePaythenaData(address || "", selectedContributor);
+
+  // Debug log to check what we're getting
+  console.log("Dashboard render:", {
+    companyDetails,
+    contributors,
+    selectedContributor,
+    contributorDetails,
   });
 
-  const { refetch: refetchContributors } = useScaffoldReadContract({
-    contractName: "PaythenaCore",
-    functionName: "getContributorAddresses",
-    args: [address],
-  });
+  // Contract write functions - move inside component
+  const { writeContractAsync: deposit } = useScaffoldWriteContract("PaythenaCore");
+  const { writeContractAsync: processPayroll } = useScaffoldWriteContract("PaythenaCore");
+  const { writeContractAsync: removeContributor } = useScaffoldWriteContract("PaythenaCore");
+  const { writeContractAsync: faucet } = useScaffoldWriteContract("MockUSDe");
+  const { writeContractAsync: approve } = useScaffoldWriteContract("MockUSDe");
 
-  const { refetch: refetchAutomation } = useScaffoldReadContract({
-    contractName: "PaythenaAutomation",
-    functionName: "automatedCompanies",
-    args: [address],
-  });
+  const { data: paythenaContract } = useDeployedContractInfo("PaythenaCore");
 
-  const { refetch: refetchSelectedContributor } = useScaffoldReadContract({
-    contractName: "PaythenaCore",
-    functionName: "debugContributor",
-    args: [address as string, selectedContributor],
-  });
-
-  return async (setRefreshKey?: React.Dispatch<React.SetStateAction<number>>) => {
+  // Memoize handlers to prevent unnecessary re-renders
+  const handleDeposit = useCallback(async () => {
+    if (!deposit || !depositAmount || !paythenaContract) return;
+    
+    setIsProcessing(true);
     try {
-      await Promise.all([
-        refetchCompany(),
-        refetchContributors(),
-        refetchAutomation(),
-        refetchSelectedContributor(),
-      ]);
-      
-      // Only update refresh key if the setter is provided
-      if (setRefreshKey) {
-        setRefreshKey(prev => prev + 1);
+      const amount = parseEther(depositAmount);
+
+      console.log("Approving tokens...", {
+        spender: paythenaContract.address,
+        amount: amount.toString()
+      });
+
+      // Approve tokens first
+      await approve({
+        functionName: "approve",
+        args: [paythenaContract.address, amount] as const,
+      });
+
+      // Wait a bit for the approval to be mined
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Then deposit
+      await deposit({
+        functionName: "deposit",
+        args: [amount] as const,
+      });
+
+      await refreshData();
+      notification.success("Deposit successful");
+      setDepositAmount("");
+    } catch (error: any) {
+      console.error("Deposit error:", error);
+      if (error.message.includes("InsufficientAllowance")) {
+        notification.error("Please approve token spending first");
+      } else if (error.message.includes("user rejected")) {
+        notification.error("Transaction rejected by user");
+      } else {
+        notification.error("Failed to deposit. Check console for details.");
       }
-    } catch (error) {
-      console.error("Refresh error:", error);
-      throw error;
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [deposit, approve, depositAmount, refreshData, paythenaContract]);
+
+  const handleFaucet = async () => {
+    if (!address) {
+      notification.error("Wallet not connected");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      await faucet({
+        functionName: "mint",
+        args: [address, parseEther("1000")] as const, // Mint 1000 USDe for testing
+      });
+
+      // Wait for transaction confirmation
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      await refreshData();
+      notification.success("Successfully claimed 1000 test USDe!");
+    } catch (error: any) {
+      console.error("Faucet error:", error);
+      if (error.message.includes("user rejected")) {
+        notification.error("Transaction rejected by user");
+      } else if (error.message.includes("insufficient funds")) {
+        notification.error("Insufficient ETH for gas");
+      } else {
+        notification.error("Failed to claim test USDe. Check console for details.");
+      }
+    } finally {
+      setIsProcessing(false);
     }
   };
-};
 
-const getPaymentStatus = (contributor: ContributorDebugInfo) => {
-  if (!contributor.isActive) return { status: "Inactive", class: "badge-error" };
-
-  const now = BigInt(Math.floor(Date.now() / 1000));
-
-  try {
-    // Add debug logging
-    console.log("Payment Status Debug:", {
-      lastPayment: contributor.lastPayment?.toString(),
-      nextPayment: contributor.nextPayment?.toString(),
-      now: now.toString(),
-      isActive: contributor.isActive,
-    });
-
-    // Check if payment was ever made
-    if (!contributor.lastPayment || contributor.lastPayment === BigInt(0)) {
-      return { status: "Never Paid", class: "badge-warning" };
-    }
-
-    // Check if next payment is due
-    if (now >= contributor.nextPayment) {
-      return { status: "Payment Due", class: "badge-warning" };
-    }
-
-    // If we got here, payment was made and next payment isn't due yet
-    return { status: "Paid", class: "badge-success" };
-  } catch (error) {
-    console.error("Error in getPaymentStatus:", error);
-    return { status: "Error", class: "badge-error" };
-  }
-};
-
-const ContributorDetails = ({
-  address,
-  contributorAddress,
-  onRemove,
-  onConfigureSalary,
-  selectedContributor,
-  onSelectContributor,
-  refreshData,
-}: {
-  address: string | undefined;
-  contributorAddress: string;
-  onRemove: (address: string) => void;
-  onConfigureSalary: (address: string) => void;
-  selectedContributor: string;
-  onSelectContributor: (address: string) => void;
-  refreshData: () => Promise<void>;
-}) => {
-  const { data: contributor } = useScaffoldReadContract<"PaythenaCore", "debugContributor">({
-    contractName: "PaythenaCore",
-    functionName: "debugContributor",
-    args: [address as string, contributorAddress],
-  }) as { data: ContributorDebugInfo | undefined };
-
-  const { data: paymentHistory, refetch: refetchPaymentHistory } = useScaffoldReadContract({
-    contractName: "PaythenaCore",
-    functionName: "getPaymentHistory",
-    args: [address, contributorAddress],
-  }) as { data: PaymentRecord[] | undefined, refetch: () => Promise<any> };
-
-  // Debug logging
-  console.log("Debug contributor:", {
-    company: address,
-    contributor: contributorAddress,
-    data: contributor,
-  });
-
-  if (!contributor) {
+  // Early returns with better UX
+  if (isLoading) {
     return (
-      <tr>
-        <td colSpan={6} className="text-center">
-          <span className="loading loading-spinner loading-sm"></span>
-        </td>
-      </tr>
+      <div className="flex flex-col items-center justify-center min-h-screen p-8">
+        <div className="card bg-base-100 shadow-xl p-8">
+          <div className="loading loading-spinner loading-lg"></div>
+          <h2 className="text-2xl font-bold mt-4">Loading Dashboard...</h2>
+        </div>
+      </div>
     );
   }
 
-  return (
-    <tr className={`hover:bg-base-200 transition-colors ${selectedContributor === contributorAddress ? "bg-primary/5" : ""}`}>
-      <td>
-        <input
-          type="radio"
-          name="selectedContributor"
-          checked={selectedContributor === contributorAddress}
-          onChange={() => onSelectContributor(contributorAddress)}
-          className="radio radio-primary"
-        />
-      </td>
-      <td className="font-medium">{contributor.name || "N/A"}</td>
-      <td>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-mono">{contributorAddress.slice(0, 6)}...{contributorAddress.slice(-4)}</span>
-          <button
-            className="btn btn-ghost btn-xs"
-            onClick={() => navigator.clipboard.writeText(contributorAddress)}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-              <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-            </svg>
-          </button>
-        </div>
-      </td>
-      <td>
-        <div className="font-mono">{contributor.salary ? formatEther(contributor.salary) : "0"} USDe</div>
-      </td>
-      <td>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs">Frequency:</span>
-            <span className="badge badge-sm">
-              {contributor.paymentFrequency ? Math.floor(Number(contributor.paymentFrequency) / 86400) : 0} days
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs">Last Payment:</span>
-            <span className="badge badge-sm">
-              {contributor.lastPayment ? new Date(Number(contributor.lastPayment) * 1000).toLocaleDateString() : "Never"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs">Next Payment:</span>
-            <span className="badge badge-sm">
-              {contributor.nextPayment ? getTimeUntilPayment(contributor.nextPayment) : "N/A"}
-            </span>
-          </div>
-          {paymentHistory && paymentHistory.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs">Latest TX:</span>
-              <a
-                href={`https://sepolia.etherscan.io/tx/${paymentHistory[paymentHistory.length - 1].txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:opacity-80 truncate max-w-[100px]"
+  if (isDisconnected) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-8">
+        <div className="card bg-base-100 shadow-xl p-8 text-center">
+          <h2 className="text-2xl font-bold mb-4">Welcome Back!</h2>
+          {hasLastSession ? (
+            <>
+              <p className="mb-4">Please reconnect your wallet to continue.</p>
+              <button 
+                className="btn btn-primary"
+                onClick={() => document.getElementById("wallet-btn")?.click()}
               >
-                {paymentHistory[paymentHistory.length - 1].txHash.slice(0, 6)}...
-                {paymentHistory[paymentHistory.length - 1].txHash.slice(-4)}
-              </a>
-            </div>
+                Connect Wallet
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="mb-4">Please connect your wallet to access the dashboard.</p>
+              <button 
+                className="btn btn-primary"
+                onClick={() => document.getElementById("wallet-btn")?.click()}
+              >
+                Connect Wallet
+              </button>
+            </>
           )}
         </div>
-      </td>
-      <td>
-        <div className="flex flex-col gap-2 min-w-[120px]">
-          <span className={`badge badge-sm ${contributor.isActive ? "badge-success" : "badge-error"} whitespace-nowrap`}>
-            {contributor.isActive ? "Active" : "Inactive"}
-          </span>
-          <span className={`badge badge-sm ${getPaymentStatus(contributor).class} whitespace-nowrap`}>
-            {getPaymentStatus(contributor).status}
-          </span>
+      </div>
+    );
+  }
+
+  if (!companyDetails) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-8">
+        <div className="card bg-base-100 shadow-xl p-8">
+          <div className="loading loading-spinner loading-lg mb-4"></div>
+          <h2 className="text-2xl font-bold">Loading Company Details...</h2>
+          <p className="text-base-content/70 mt-2">Please wait while we fetch your data.</p>
         </div>
-      </td>
-      <td>
-        <div className="flex flex-col gap-2">
-          <button
-            className="btn btn-xs btn-primary"
-            onClick={() => onConfigureSalary(contributorAddress)}
-            disabled={!contributor.exists}
-          >
-            Configure
-          </button>
-          <button
-            className="btn btn-xs btn-error"
-            onClick={() => onRemove(contributorAddress)}
-            disabled={!contributor.exists}
-          >
-            Remove
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-};
+      </div>
+    );
+  }
 
-export const CompanyDashboard = () => {
-  const { address } = useAccount();
-  const [amount, setAmount] = useState("");
-  const [isDepositing, setIsDepositing] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isConfigureModalOpen, setIsConfigureModalOpen] = useState(false);
-  const [selectedContributor, setSelectedContributor] = useState<string>("");
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  // Read company data
-  const { data: companyDetails } = useScaffoldReadContract<"PaythenaCore", string>({
-    contractName: "PaythenaCore",
-    functionName: "getCompanyDetails",
-    args: [address],
-  }) as { data: CompanyDetails | undefined };
-
-  // First approve USDe spending
-  const { writeContractAsync: approveUSDe } = useScaffoldWriteContract("MockUSDe");
-
-  // Then deposit to PaythenaCore
-  const { writeContractAsync: depositFunds } = useScaffoldWriteContract("PaythenaCore");
-
-  // Get PaythenaCore contract info
-  const { data: paythenaContract } = useDeployedContractInfo("PaythenaCore");
-
-  // Add mint function for USDe
-  const { writeContractAsync: mintUsde } = useScaffoldWriteContract("MockUSDe");
-
-  // Add contract write hooks
-  const { writeContractAsync: processPayroll } = useScaffoldWriteContract("PaythenaCore");
-  const { writeContractAsync: pauseCompany } = useScaffoldWriteContract("PaythenaCore");
-
-  // Update the contributor addresses hook
-  const { data: contributorAddresses } = useScaffoldReadContract<"PaythenaCore", "getContributorAddresses">({
-    contractName: "PaythenaCore",
-    functionName: "getContributorAddresses",
-    args: [address],
-  }) as { data: string[] | undefined };
-
-  // Add remove contributor function
-  const { writeContractAsync: removeContributor } = useScaffoldWriteContract("PaythenaCore");
-
-  const { data: selectedContributorData } = useScaffoldReadContract<"PaythenaCore", "debugContributor">({
-    contractName: "PaythenaCore",
-    functionName: "debugContributor",
-    args: [address as string, selectedContributor],
-  }) as { data: ContributorDebugInfo | undefined };
-
-  // Add this button next to Process Payroll
-  const { writeContractAsync: updateNextPayment } = useScaffoldWriteContract("PaythenaCore");
-
-  // Add refresh function
-  const refreshData = useRefreshData(address, selectedContributor);
-
-  const { writeContractAsync: enableAutomation } = useScaffoldWriteContract("PaythenaAutomation");
-  const { writeContractAsync: disableAutomation } = useScaffoldWriteContract("PaythenaAutomation");
-
-  const { data: isAutomated, refetch: refetchAutomation } = useScaffoldReadContract({
-    contractName: "PaythenaAutomation",
-    functionName: "automatedCompanies",
-    args: [address],
-  });
-
-  const handleDeposit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0) {
-      notification.error("Please enter a valid amount");
+  // Handle process payroll
+  const handleProcessPayroll = async () => {
+    if (!selectedContributor) {
+      notification.error("Please select a contributor");
       return;
     }
 
-    if (!paythenaContract?.address) {
-      notification.error("Contract not found");
+    // Get contributor details from the existing data
+    const selectedContributorDetails = contributors.find(c => c === selectedContributor);
+    if (!selectedContributorDetails) {
+      notification.error("Contributor not found");
       return;
     }
 
-    if (!companyDetails?.[3]) {
-      // Check if company is active
-      notification.error("Company is not active");
-      return;
-    }
-
-    setIsDepositing(true);
+    setIsProcessing(true);
     try {
-      const parsedAmount = parseEther(amount);
-
-      // Debug logs
-      console.log("Deposit details:", {
-        amount: parsedAmount.toString(),
-        paythenaAddress: paythenaContract.address,
-        userAddress: address,
-        companyDetails: Object.values(companyDetails).map(x => x.toString()),
+      await processPayroll({
+        functionName: "processSalary",
+        args: [selectedContributor] as const,
       });
 
-      // First approve
-      await approveUSDe({
-        functionName: "approve",
-        args: [paythenaContract.address, parsedAmount] as const,
-      });
-      notification.info("Approval confirmed");
-
-      // Then deposit
-      await depositFunds({
-        functionName: "deposit",
-        args: [parsedAmount] as const,
-      });
-      notification.success("Funds deposited successfully!");
-      setAmount("");
+      await refreshData();
+      notification.success("Payment processed successfully");
     } catch (error: any) {
-      console.error("Full error:", error);
-      if (error.message.includes("CompanyNotActive")) {
-        notification.error("Company is not active");
-      } else if (error.message.includes("InvalidAmount")) {
-        notification.error("Invalid amount");
-      } else if (error.message.includes("TransferFailed")) {
-        notification.error("Transfer failed. Please check your balance");
+      console.error("Process payment error:", error);
+      if (error.message.includes("PaymentAlreadyProcessed")) {
+        notification.error("Payment not due yet");
+      } else if (error.message.includes("InsufficientBalance")) {
+        notification.error("Insufficient balance for payment");
+      } else if (error.message.includes("user rejected")) {
+        notification.error("Transaction rejected by user");
       } else {
-        notification.error("Failed to deposit funds");
+        notification.error("Failed to process payment. Check console for details.");
       }
     } finally {
-      setIsDepositing(false);
+      setIsProcessing(false);
     }
   };
 
+  // Add helper function to format time until next payment
+  const getTimeUntilNextPayment = (nextPayment: bigint) => {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const timeLeftBigInt = nextPayment - now;
+    const timeLeftNumber = Number(timeLeftBigInt);
+
+    if (timeLeftNumber <= 0) return "Payment Due";
+
+    const days = Math.floor(timeLeftNumber / 86400);
+    const hours = Math.floor((timeLeftNumber % 86400) / 3600);
+    const minutes = Math.floor((timeLeftNumber % 3600) / 60);
+
+    return `${days}d ${hours}h ${minutes}m`;
+  };
+
+  // Handle remove contributor
   const handleRemoveContributor = async (contributorAddress: string) => {
+    if (!removeContributor) {
+      notification.error("Contract not initialized");
+      return;
+    }
+
+    setIsProcessing(true);
     try {
       await removeContributor({
         functionName: "removeContributor",
         args: [contributorAddress] as const,
       });
-      notification.success("Contributor removed successfully!");
-    } catch (error) {
-      notification.error("Failed to remove contributor");
-    }
-  };
 
-  const handleProcessPayroll = async () => {
-    try {
-      if (!selectedContributor) {
-        notification.error("Please select a contributor first");
-        return;
-      }
-
-      if (!selectedContributorData?.isActive) {
-        notification.error("Contributor is not active");
-        return;
-      }
-
-      const paymentStatus = getPaymentStatus(selectedContributorData);
-      if (paymentStatus.status === "Paid") {
-        notification.error("Payment already processed for this period");
-        return;
-      }
-
-      // Process the payroll and get the transaction response
-      const result = await processPayroll({
-        functionName: "processSalary",
-        args: [selectedContributor] as const,
-      });
-
-      // Wait for transaction to be mined
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Refresh data
-      await refreshData(setRefreshKey);
-      
-      // Show success notification with transaction hash
-      if (result && typeof result === 'string') {
-        notification.success(
-          <div className="flex flex-col gap-1">
-            <p>Payroll processed successfully!</p>
-            <a 
-              href={`https://sepolia.etherscan.io/tx/${result}`} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-sm text-primary hover:opacity-80 truncate"
-            >
-              View transaction: {result.slice(0, 6)}...{result.slice(-4)}
-            </a>
-          </div>
-        );
-      } else {
-        notification.success("Payroll processed successfully!");
-      }
-
+      await refreshData();
+      notification.success("Contributor removed successfully");
     } catch (error: any) {
-      console.error("Process payroll error:", error);
-      if (error.message.includes("Payment already processed")) {
-        notification.error("Payment already processed for this period");
-      } else if (error.message.includes("Payment not due")) {
-        notification.error("Payment is not due yet");
-      } else if (error.message.includes("Insufficient balance")) {
-        notification.error("Insufficient company balance");
+      console.error("Remove contributor error:", error);
+      if (error.message.includes("user rejected")) {
+        notification.error("Transaction rejected by user");
       } else {
-        notification.error("Failed to process payroll");
+        notification.error("Failed to remove contributor");
       }
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleRefresh = async () => {
+  // Add helper functions for payment status
+  const getNextPaymentStatus = () => {
+    if (!contributorDetails) return "badge-neutral";
+    
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const nextPayment = contributorDetails.nextPayment as bigint;
+    
+    if (!nextPayment) return "badge-neutral";
+    if (now >= nextPayment) return "badge-warning";
+    return "badge-success";
+  };
+
+  const getNextPaymentDue = () => {
+    if (!contributorDetails) return "No payments";
+    
+    const nextPayment = contributorDetails.nextPayment as bigint;
+    if (!nextPayment) return "Not scheduled";
+
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const timeLeft = Number(nextPayment - now);
+
+    if (timeLeft <= 0) return "Payment Due";
+
+    const days = Math.floor(timeLeft / 86400);
+    const hours = Math.floor((timeLeft % 86400) / 3600);
+    const minutes = Math.floor((timeLeft % 3600) / 60);
+
+    return `${days}d ${hours}h ${minutes}m`;
+  };
+
+  // Add function to get total pending payments
+  const getPendingPayments = () => {
+    if (!contributors || !contributorDetails) return 0;
+    
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    let count = 0;
+
+    contributors.forEach(contributor => {
+      const nextPayment = contributorDetails.nextPayment as bigint;
+      if (nextPayment && now >= nextPayment) count++;
+    });
+
+    return count;
+  };
+
+  // Add function to process all due payments
+  const handleProcessDuePayments = async () => {
+    if (!contributors || getPendingPayments() === 0) return;
+
+    setIsProcessing(true);
     try {
-      await refreshData(setRefreshKey);
-      notification.success("Data refreshed successfully!");
-    } catch (error) {
-      console.error("Refresh error:", error);
-      notification.error("Failed to refresh data");
+      // Process each due payment
+      for (const contributor of contributors) {
+        try {
+          await processPayroll({
+            functionName: "processSalary",
+            args: [contributor] as const,
+          });
+          // Wait a bit between transactions
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error: any) {
+          if (error.message.includes("PaymentAlreadyProcessed")) {
+            console.log(`Payment not due yet for ${contributor}`);
+            continue;
+          }
+          throw error;
+        }
+      }
+      
+      await refreshData();
+      notification.success("All due payments processed successfully");
+    } catch (error: any) {
+      console.error("Process due payments error:", error);
+      if (error.message.includes("user rejected")) {
+        notification.error("Transaction rejected by user");
+      } else {
+        notification.error("Failed to process due payments. Check console for details.");
+      }
+    } finally {
+      setIsProcessing(false);
     }
+  };
+
+  // Add helper function to check if payment is due
+  const isDue = (details: any) => {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    return details.isActive && now >= details.nextPayment;
+  };
+
+  // Add helper function to get contributor details
+  const getContributorDetails = async (contributor: string) => {
+    try {
+      const { data } = await readContract({
+        address: deployedContract?.address,
+        abi: deployedContract?.abi,
+        functionName: "getContributorDetails",
+        args: [address, contributor],
+      });
+      return data;
+    } catch (error) {
+      console.error("Get contributor details error:", error);
+      return null;
+    }
+  };
+
+  // First, add a helper function to get a clear payment overview
+  const getPaymentOverview = () => {
+    if (!contributors || contributors.length === 0) {
+      return {
+        status: "No Contributors",
+        class: "badge-neutral",
+        count: 0,
+        nextDue: "No payments scheduled"
+      };
+    }
+
+    const pendingCount = getPendingPayments();
+    
+    if (pendingCount > 0) {
+      return {
+        status: `${pendingCount} Payment${pendingCount > 1 ? 's' : ''} Due`,
+        class: "badge-warning",
+        count: pendingCount,
+        nextDue: "Payments ready to process"
+      };
+    }
+
+    // Find next scheduled payment
+    let earliestPayment: bigint | null = null;
+    contributors.forEach(contributor => {
+      const details = contributorDetails?.find(d => d.address === contributor);
+      if (details?.nextPayment) {
+        if (!earliestPayment || details.nextPayment < earliestPayment) {
+          earliestPayment = details.nextPayment;
+        }
+      }
+    });
+
+    if (earliestPayment) {
+      const now = BigInt(Math.floor(Date.now() / 1000));
+      const timeLeft = Number(earliestPayment - now);
+      const days = Math.floor(timeLeft / 86400);
+      const hours = Math.floor((timeLeft % 86400) / 3600);
+
+      return {
+        status: "All Payments Up to Date",
+        class: "badge-success",
+        count: 0,
+        nextDue: `Next payment in ${days}d ${hours}h`
+      };
+    }
+
+    return {
+      status: "No Pending Payments",
+      class: "badge-success",
+      count: 0,
+      nextDue: "All payments processed"
+    };
   };
 
   return (
-    <div className="flex flex-col gap-8 p-4 max-w-7xl mx-auto">
-      {/* Page Header - Using primary color for highlight */}
-      <div className="bg-base-200 rounded-box p-4 shadow-sm border border-base-300">
-        <div className="flex flex-col">
-          <h1 className="text-4xl font-bold text-primary">Company Dashboard</h1>
-          <div className="text-sm breadcrumbs">
-            <ul>
-              <li><Link href="/" className="text-primary hover:opacity-80">Home</Link></li>
-              <li className="text-base-content/70">Dashboard</li>
-            </ul>
+    <div className="flex flex-col gap-6 p-6 bg-base-200 min-h-screen">
+      {/* Header Section */}
+      <header className="bg-base-100 rounded-box p-6 shadow-lg">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-primary">
+              {companyDetails.name || "Company Dashboard"}
+            </h1>
+            <div className="text-sm breadcrumbs opacity-70">
+              <ul>
+                <li>Dashboard</li>
+                <li>Overview</li>
+              </ul>
+            </div>
+          </div>
+          
+          {/* Quick Actions */}
+          <div className="flex gap-3">
+            <button 
+              className="btn btn-primary btn-sm gap-2"
+              onClick={() => setIsAddModalOpen(true)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+              </svg>
+              Add Contributor
+            </button>
+            <button 
+              className="btn btn-ghost btn-sm"
+              onClick={refreshData}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Balance Card */}
+        <div className="stats bg-base-100 shadow-lg">
+          <div className="stat">
+            <div className="stat-title flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" />
+              </svg>
+              Balance
+            </div>
+            <div className="stat-value text-primary">
+              {formatEther(companyDetails.balance)} USDe
+            </div>
+          </div>
+        </div>
+
+        {/* Contributors Card */}
+        <div className="stats bg-base-100 shadow-lg">
+          <div className="stat">
+            <div className="stat-title flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-secondary" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+              </svg>
+              Contributors
+            </div>
+            <div className="stat-value">{contributors.length}</div>
+          </div>
+        </div>
+
+        {/* Payment Overview Card */}
+        <div className="stats bg-base-100 shadow-lg">
+          <div className="stat">
+            <div className="stat-title flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-accent" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+              </svg>
+              Payment Overview
+            </div>
+            <div className="stat-value">
+              <span className={`badge ${getPaymentOverview().class}`}>
+                {getPaymentOverview().status}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Company Status Card */}
+        <div className="stats bg-base-100 shadow-lg">
+          <div className="stat">
+            <div className="stat-title flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-info" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+              </svg>
+              Company Status
+            </div>
+            <div className="stat-value">
+              <span className={`badge ${companyDetails.isActive ? "badge-success" : "badge-error"}`}>
+                {companyDetails.isActive ? "Active" : "Inactive"}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column */}
-        <div className="lg:col-span-1 flex flex-col gap-6">
-          {/* Company Info Card */}
-          <div className="card bg-base-100 shadow-lg border border-base-200 hover:border-primary/20 transition-colors">
-            <div className="card-body">
-              <h2 className="card-title flex gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-                Company Details
+      {/* Main Content */}
+      <div className="grid grid-cols-1 gap-6">
+        {/* Contributors Table */}
+        <div className="card bg-base-100 shadow-lg">
+          <div className="card-body">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="card-title">
+                Contributors ({contributors?.length || 0})
               </h2>
-              {companyDetails && (
-                <div className="grid grid-cols-1 gap-4 mt-4">
-                  <div className="stat bg-base-200 rounded-box">
-                    <div className="stat-title">Name</div>
-                    <div className="stat-value text-lg truncate">{companyDetails[0]}</div>
-                  </div>
-                  <div className="stat bg-base-200 rounded-box">
-                    <div className="stat-title">Balance</div>
-                    <div className="stat-value text-lg">{formatEther(companyDetails[1])} USDe</div>
-                    <div className="stat-actions mt-2">
-                      <button
-                        className="btn btn-sm btn-outline gap-2"
-                        onClick={async () => {
-                          try {
-                            await mintUsde({
-                              functionName: "mint",
-                              args: [address, parseEther("10000")] as const,
-                            });
-                            notification.success("Minted 10,000 USDe");
-                            await refreshData(setRefreshKey);
-                          } catch (error) {
-                            console.error("Mint error:", error);
-                            notification.error("Failed to mint USDe");
-                          }
-                        }}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        Get Test USDe
-                      </button>
-                    </div>
-                  </div>
-                  <div className="stat bg-base-200 rounded-box">
-                    <div className="stat-title">Status</div>
-                    <div className="stat-value text-lg">
-                      <span className={`badge ${companyDetails[3] ? "badge-success" : "badge-error"}`}>
-                        {companyDetails[3] ? "Active" : "Inactive"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="stat bg-base-200 rounded-box">
-                    <div className="stat-title">Automation</div>
-                    <div className="flex justify-between items-center">
-                      <span className={`badge badge-lg ${isAutomated ? "badge-success" : "badge-warning"}`}>
-                        {isAutomated ? "Enabled" : "Disabled"}
-                      </span>
-                      <button
-                        className={`btn btn-sm ${isAutomated ? "btn-error" : "btn-success"}`}
-                        onClick={async () => {
-                          try {
-                            if (isAutomated) {
-                              await disableAutomation({
-                                functionName: "disableAutomation",
-                              });
-                            } else {
-                              await enableAutomation({
-                                functionName: "enableAutomation",
-                              });
-                            }
-                            await refreshData(setRefreshKey);
-                            notification.success(`Automation ${isAutomated ? "disabled" : "enabled"}!`);
-                          } catch (error) {
-                            notification.error("Failed to update automation status");
-                          }
-                        }}
-                      >
-                        {isAutomated ? "Disable" : "Enable"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Deposit Form Card */}
-          <div className="card bg-base-100 shadow-lg border border-base-200 hover:border-primary/20 transition-colors">
-            <div className="card-body">
-              <h2 className="card-title flex gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Deposit Funds
-              </h2>
-              <form onSubmit={handleDeposit} className="mt-4">
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Amount (USDe)</span>
-                  </label>
-                  <div className="join w-full">
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Enter amount"
-                      className="input input-bordered join-item flex-1"
-                      value={amount}
-                      onChange={e => setAmount(e.target.value)}
-                      disabled={isDepositing}
-                    />
-                    <button
-                      type="submit"
-                      className={`btn btn-primary join-item ${isDepositing ? "loading" : ""}`}
-                      disabled={isDepositing || !amount || parseFloat(amount) <= 0}
-                    >
-                      {isDepositing ? "Depositing..." : "Deposit"}
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          {/* Quick Actions Card */}
-          <div className="card bg-base-100 shadow-lg border border-base-200 hover:border-primary/20 transition-colors">
-            <div className="card-body">
-              <h2 className="card-title flex gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Quick Actions
-              </h2>
-              <div className="divider my-2"></div>
-              <div className="flex flex-col gap-3">
-                <div className="bg-base-200 rounded-box p-3">
-                  <div className="text-sm opacity-70 mb-2">Selected Contributor</div>
-                  <div className="badge badge-lg badge-outline">
-                    {selectedContributor ? (selectedContributorData?.name || "Loading...") : "None selected"}
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  <button
-                    className={`btn btn-primary ${!selectedContributor || !selectedContributorData?.isActive ? 'btn-disabled' : ''}`}
-                    onClick={handleProcessPayroll}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
-                      <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
-                    </svg>
-                    Process Payroll
-                  </button>
-                  <button
-                    className={`btn btn-secondary ${!selectedContributor ? 'btn-disabled' : ''}`}
-                    onClick={async () => {
-                      try {
-                        if (!selectedContributor) {
-                          notification.error("Please select a contributor first");
-                          return;
-                        }
-                        const now = Math.floor(Date.now() / 1000);
-                        await updateNextPayment({
-                          functionName: "updateNextPayment",
-                          args: [selectedContributor, BigInt(now)] as const,
-                        });
-                        notification.success("Payment date updated!");
-                      } catch (error) {
-                        console.error("Update payment date error:", error);
-                        notification.error("Failed to update payment date");
-                      }
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                    </svg>
-                    Set Payment Due
-                  </button>
+              <div className="flex gap-2">
+                <div className="join">
+                  <input 
+                    type="text" 
+                    placeholder="Search contributors..." 
+                    className="input input-bordered input-sm join-item" 
+                  />
+                  <button className="btn btn-sm join-item">Search</button>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Right Column - Contributors List */}
-        <div className="lg:col-span-2">
-          <div className="card bg-base-100 shadow-lg border border-base-200 hover:border-primary/20 transition-colors h-full">
-            <div className="card-body p-0">
-              {/* Header */}
-              <div className="p-4 flex justify-between items-center border-b border-base-200 sticky top-0 bg-base-100 z-10">
-                <div className="flex items-center gap-3">
-                  <h2 className="card-title">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    Contributors
-                  </h2>
-                  <div className="badge badge-neutral">{contributorAddresses?.length || 0}</div>
-                  <button 
-                    className="btn btn-ghost btn-sm btn-circle tooltip tooltip-bottom"
-                    data-tip="Refresh data"
-                    onClick={handleRefresh}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </button>
-                </div>
-                <button 
-                  className="btn btn-primary btn-sm gap-2"
-                  onClick={() => setIsAddModalOpen(true)}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                  </svg>
-                  Add Contributor
-                </button>
-              </div>
-
-              {/* Table */}
-              <div className="overflow-x-auto overflow-y-auto flex-1">
-                <table className="table table-zebra table-pin-rows w-full">
+            {/* Contributors Table */}
+            <div className="overflow-x-auto">
+              {contributors?.length > 0 ? (
+                <table className="table w-full">
                   <thead>
-                    <tr className="bg-base-200">
-                      <th className="w-16 bg-base-200">Select</th>
-                      <th className="bg-base-200">Name</th>
-                      <th className="bg-base-200">Address</th>
-                      <th className="bg-base-200">Salary</th>
-                      <th className="bg-base-200">Payment Info</th>
-                      <th className="bg-base-200">Status</th>
-                      <th className="w-32 bg-base-200">Actions</th>
+                    <tr>
+                      <th>Select</th>
+                      <th>Contributor</th>
+                      <th>Salary</th>
+                      <th>Status</th>
+                      <th>Payment Info</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {contributorAddresses?.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="text-center py-8">
-                          <div className="flex flex-col items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                            <p className="text-base-content/60">No contributors found</p>
-                            <button 
-                              className="btn btn-primary btn-sm mt-2"
-                              onClick={() => setIsAddModalOpen(true)}
-                            >
-                              Add your first contributor
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      contributorAddresses?.map(contributorAddress => (
-                        <ContributorDetails
-                          key={`${contributorAddress}-${refreshKey}`}
-                          address={address}
-                          contributorAddress={contributorAddress}
-                          onRemove={handleRemoveContributor}
-                          onConfigureSalary={addr => {
-                            setSelectedContributor(addr);
-                            setIsConfigureModalOpen(true);
-                          }}
-                          selectedContributor={selectedContributor}
-                          onSelectContributor={setSelectedContributor}
-                          refreshData={() => refreshData(setRefreshKey)}
-                        />
-                      ))
-                    )}
+                    {contributors.map((contributor) => (
+                      <ContributorDetails
+                        key={contributor}
+                        address={address}
+                        contributorAddress={contributor}
+                        onRemove={handleRemoveContributor}
+                        selectedContributor={selectedContributor}
+                        onSelectContributor={setSelectedContributor}
+                        refreshData={refreshData}
+                        companyDetails={companyDetails}
+                      />
+                    ))}
                   </tbody>
                 </table>
-              </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-base-content/70">No contributors found</p>
+                  <button 
+                    className="btn btn-primary btn-sm mt-2"
+                    onClick={() => setIsAddModalOpen(true)}
+                  >
+                    Add your first contributor
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -772,24 +598,518 @@ export const CompanyDashboard = () => {
 
       {/* Modals */}
       <AddContributorModal 
-        isOpen={isAddModalOpen} 
+        isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onSuccess={async () => {
-          await refreshData(setRefreshKey);
-          setIsAddModalOpen(false);
-        }}
-      />
-      <ConfigureSalaryModal
-        isOpen={isConfigureModalOpen}
-        onClose={() => setIsConfigureModalOpen(false)}
-        contributorAddress={selectedContributor}
-        companyAddress={address}
-        onSuccess={async () => {
-          await refreshData(setRefreshKey);
-          setIsConfigureModalOpen(false);
-        }}
+        onSuccess={refreshData}
       />
     </div>
+  );
+};
+
+const ContributorOption = ({ 
+  address, 
+  contributor 
+}: { 
+  address: string | undefined;
+  contributor: string;
+}) => {
+  const { data: details } = useScaffoldReadContract({
+    contractName: "PaythenaCore",
+    functionName: "getContributorDetails",
+    args: [address as string, contributor],
+  });
+
+  if (!details) return (
+    <option value={contributor}>
+      {contributor}
+    </option>
+  );
+
+  const [name, salary, nextPayment] = details as any[];
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const isPaymentDue = nextPayment && now >= nextPayment;
+  
+  return (
+    <option value={contributor}>
+      {name || contributor} {isPaymentDue ? "- Payment Due" : ""}
+    </option>
+  );
+};
+
+const ContributorPaymentInfo = ({
+  address,
+  selectedContributor,
+  getTimeUntilNextPayment,
+}: {
+  address: string | undefined;
+  selectedContributor: string;
+  getTimeUntilNextPayment: (nextPayment: bigint) => string;
+}) => {
+  const { data: details } = useScaffoldReadContract({
+    contractName: "PaythenaCore",
+    functionName: "getContributorDetails",
+    args: [address as string, selectedContributor],
+  });
+
+  if (!details) return null;
+
+  const [name, salary, nextPayment] = details as any[];
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const isPaymentDue = nextPayment && now >= nextPayment;
+
+  return (
+    <>
+      <div className="flex justify-between items-center">
+        <span>Next Payment:</span>
+        <span className={isPaymentDue ? "text-warning" : ""}>
+          {getTimeUntilNextPayment(nextPayment)}
+        </span>
+      </div>
+      <div className="flex justify-between items-center">
+        <span>Amount:</span>
+        <span>{formatEther(salary)} USDe</span>
+      </div>
+    </>
+  );
+};
+
+// Create a separate component for payment countdown
+const PaymentCountdown = ({
+  nextPayment,
+}: {
+  nextPayment: bigint | undefined;
+}) => {
+  const [timeToNextPayment, setTimeToNextPayment] = useState<string>("");
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (nextPayment) {
+        const now = BigInt(Math.floor(Date.now() / 1000));
+        const timeLeft = Number(nextPayment - now);
+        
+        if (timeLeft <= 0) {
+          setTimeToNextPayment("Payment Due");
+        } else {
+          const hours = Math.floor(timeLeft / 3600);
+          const minutes = Math.floor((timeLeft % 3600) / 60);
+          const seconds = timeLeft % 60;
+          setTimeToNextPayment(`${hours}h ${minutes}m ${seconds}s`);
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [nextPayment]);
+
+  return <span>{timeToNextPayment || "Loading..."}</span>;
+};
+
+// Update ContributorBalanceMonitor to use the countdown component
+const ContributorBalanceMonitor = ({
+  contributorAddress,
+  nextPayment,
+}: {
+  contributorAddress: string;
+  nextPayment: bigint | undefined;
+}) => {
+  const { data: contributorBalance } = useScaffoldReadContract({
+    contractName: "MockUSDe",
+    functionName: "balanceOf",
+    args: [contributorAddress],
+  });
+
+  const [lastCheckedBalance, setLastCheckedBalance] = useState<bigint>(BigInt(0));
+
+  useEffect(() => {
+    const balance = contributorBalance ? BigInt(contributorBalance.toString()) : BigInt(0);
+    if (balance > lastCheckedBalance) {
+      notification.success(
+        `Payment received: ${formatEther(balance - lastCheckedBalance)} USDe`
+      );
+      setLastCheckedBalance(balance);
+    }
+  }, [contributorBalance, lastCheckedBalance]);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs font-medium">
+        Balance: {formatEther(BigInt(contributorBalance?.toString() || "0"))} USDe
+      </span>
+      <span className="text-xs">
+        Next Payment: <PaymentCountdown nextPayment={nextPayment} />
+      </span>
+    </div>
+  );
+};
+
+// Update the ContributorDetails component to pass nextPayment
+const ContributorDetails = ({
+  address,
+  contributorAddress,
+  onRemove,
+  selectedContributor,
+  onSelectContributor,
+  refreshData,
+  companyDetails,
+}: {
+  address: string | undefined;
+  contributorAddress: string;
+  onRemove: (address: string) => void;
+  selectedContributor: string;
+  onSelectContributor: (address: string) => void;
+  refreshData: () => Promise<void>;
+  companyDetails: CompanyDetails;
+}) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Add contract write hook
+  const { writeContractAsync: processPayroll } = useScaffoldWriteContract("PaythenaCore");
+
+  // Use the custom hook
+  const details = useContributorDetails(address, contributorAddress);
+
+  // Get payment history
+  const { data: paymentHistory } = useScaffoldReadContract({
+    contractName: "PaythenaCore",
+    functionName: "getPaymentHistory",
+    args: [address as string, contributorAddress],
+  });
+
+  // Move getTimeUntilNextPayment before it's used
+  const getTimeUntilNextPayment = useCallback(() => {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const timeLeftBigInt = details?.nextPayment - now;
+    const timeLeftNumber = Number(timeLeftBigInt);
+
+    if (timeLeftNumber <= 0) return "Payment Due";
+
+    const days = Math.floor(timeLeftNumber / 86400);
+    const hours = Math.floor((timeLeftNumber % 86400) / 3600);
+    const minutes = Math.floor((timeLeftNumber % 3600) / 60);
+
+    return `${days}d ${hours}h ${minutes}m`;
+  }, [details?.nextPayment]);
+
+  // Helper functions
+  const canProcessPayment = useCallback(() => {
+    const companyBalance = companyDetails?.balance || BigInt(0);
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const nextPaymentTime = BigInt(details?.nextPayment || 0);
+    return details?.isActive && companyBalance >= details.salary && now >= nextPaymentTime;
+  }, [companyDetails?.balance, details?.isActive, details?.salary, details?.nextPayment]);
+
+  const isDue = useCallback(() => {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const nextPaymentTime = BigInt(details?.nextPayment || 0);
+    return details?.isActive && now >= nextPaymentTime;
+  }, [details?.isActive, details?.nextPayment]);
+
+  const handleProcessPayment = useCallback(async () => {
+    if (!canProcessPayment()) {
+      if (companyDetails?.balance < details?.salary) {
+        notification.error("Insufficient balance for payment");
+      } else if (!isDue()) {
+        notification.error(`Payment not due yet. Next payment in ${getTimeUntilNextPayment()}`);
+      }
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      await processPayroll({
+        functionName: "processSalary",
+        args: [contributorAddress] as const,
+      });
+
+      await refreshData();
+      notification.success("Payment processed successfully");
+    } catch (error: any) {
+      console.error("Process payment error:", error);
+      if (error.message.includes("PaymentAlreadyProcessed")) {
+        notification.error(`Payment not due yet. Next payment in ${getTimeUntilNextPayment()}`);
+      } else if (error.message.includes("InsufficientBalance")) {
+        notification.error("Insufficient balance for payment");
+      } else if (error.message.includes("user rejected")) {
+        notification.error("Transaction rejected by user");
+      } else {
+        notification.error("Failed to process payment. Check console for details.");
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [canProcessPayment, processPayroll, contributorAddress, refreshData, companyDetails?.balance, details?.salary, isDue, getTimeUntilNextPayment]);
+
+  const handleRemove = useCallback(async () => {
+    // Add confirmation dialog with null check for details
+    if (!window.confirm(`Are you sure you want to remove ${details?.name || contributorAddress}?`)) {
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      await onRemove(contributorAddress);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [contributorAddress, onRemove, details?.name]);
+
+  // Loading state
+  if (!details) {
+    return (
+      <tr>
+        <td colSpan={7} className="text-center">
+          <span className="loading loading-spinner loading-sm"></span>
+        </td>
+      </tr>
+    );
+  }
+
+  const getPaymentStatus = () => {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    
+    if (!details.isActive) return { text: "Inactive", class: "badge-error" };
+    if (now >= details.nextPayment) return { text: "Payment Due", class: "badge-warning" };
+    if (details.lastProcessedTime === BigInt(0)) return { text: "Never Paid", class: "badge-warning" };
+    return { text: "Active", class: "badge-success" };
+  };
+
+  const status = getPaymentStatus();
+
+  // Add function to format date nicely
+  const formatDate = (timestamp: bigint | number) => {
+    const date = new Date(Number(timestamp) * 1000);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return 'Today at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (diffDays === 1) {
+      return 'Yesterday at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else {
+      return date.toLocaleDateString([], {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+  };
+
+  // Add function to get latest payment
+  const getLatestPayment = () => {
+    if (!paymentHistory || !Array.isArray(paymentHistory) || paymentHistory.length === 0) {
+      return null;
+    }
+
+    // Sort payments by timestamp in descending order
+    const sortedPayments = [...paymentHistory].sort((a, b) => 
+      Number(b.timestamp) - Number(a.timestamp)
+    );
+
+    return sortedPayments[0];
+  };
+
+  // Get latest payment
+  const latestPayment = getLatestPayment();
+
+  return (
+    <>
+      <tr className={`hover:bg-base-200 transition-colors ${selectedContributor === contributorAddress ? "bg-primary/5" : ""}`}>
+        <td>
+          <input
+            type="radio"
+            className="radio"
+            checked={selectedContributor === contributorAddress}
+            onChange={() => onSelectContributor(contributorAddress)}
+          />
+        </td>
+        <td>
+          <div className="flex flex-col gap-1">
+            <span className="font-medium">{details?.name || contributorAddress}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs opacity-60 truncate max-w-[150px]">
+                {contributorAddress}
+              </span>
+              <button
+                className="btn btn-ghost btn-xs"
+                onClick={() => copyToClipboard(contributorAddress)}
+                title="Copy address"
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className="h-4 w-4" 
+                  viewBox="0 0 20 20" 
+                  fill="currentColor"
+                >
+                  <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                  <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div className="flex flex-col">
+            <span className="font-mono">{formatEther(details?.salary || BigInt(0))} USDe</span>
+            <span className="text-xs opacity-60">
+              Every {Number(details?.paymentFrequency || 0) / 86400} days
+            </span>
+          </div>
+        </td>
+        <td>
+          <div className="flex flex-col gap-2">
+            {/* Payment Status */}
+            <div className="flex items-center gap-2">
+              <span className={`badge badge-sm ${status.class}`}>
+                {status.text}
+              </span>
+              {isDue() && (
+                <span className="badge badge-sm badge-warning">Payment Due</span>
+              )}
+            </div>
+
+            {/* Payment Timing */}
+            <div className="text-xs">
+              {isDue() ? (
+                <span className="text-warning font-medium">
+                  Payment is ready to process
+                </span>
+              ) : (
+                <span>
+                  Next payment in: {getTimeUntilNextPayment()}
+                </span>
+              )}
+            </div>
+
+            {/* Payment Actions */}
+            <div className="flex gap-2">
+              {isDue() ? (
+                <button
+                  className={`btn btn-sm btn-warning ${isProcessing ? "loading" : ""}`}
+                  onClick={handleProcessPayment}
+                  disabled={isProcessing || !canProcessPayment()}
+                >
+                  <div className="flex items-center gap-1">
+                    {isProcessing ? (
+                      <span>Processing...</span>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 1h6v2H7V6zm6 7H7v2h6v-2z" clipRule="evenodd" />
+                        </svg>
+                        <span>Process Payment</span>
+                      </>
+                    )}
+                  </div>
+                </button>
+              ) : (
+                <div className="tooltip" data-tip={`Next payment in ${getTimeUntilNextPayment()}`}>
+                  <button className="btn btn-sm btn-disabled opacity-50">
+                    Scheduled
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Payment Error Message */}
+            {!canProcessPayment() && isDue() && (
+              <div className="text-error text-xs flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <span>Insufficient balance for payment</span>
+              </div>
+            )}
+
+            {/* Payment Amount */}
+            <div className="text-xs opacity-70">
+              Amount: {formatEther(details?.salary || BigInt(0))} USDe
+            </div>
+          </div>
+        </td>
+        <td>
+          <div className="flex gap-2">
+            {isDue() && (
+              <button
+                className={`btn btn-sm btn-warning ${isProcessing ? "loading" : ""}`}
+                onClick={handleProcessPayment}
+                disabled={isProcessing || !canProcessPayment()}
+                title={!canProcessPayment() ? "Insufficient balance" : ""}
+              >
+                Pay Now
+              </button>
+            )}
+            <button
+              className={`btn btn-sm btn-error ${isProcessing ? "loading" : ""}`}
+              onClick={handleRemove}
+              disabled={isProcessing}
+            >
+              Remove
+            </button>
+          </div>
+          {!canProcessPayment() && isDue() && (
+            <div className="text-error text-xs mt-1">
+              Insufficient balance for payment
+            </div>
+          )}
+        </td>
+        <td>
+          <ContributorBalanceMonitor
+            contributorAddress={contributorAddress}
+            nextPayment={details?.nextPayment}
+          />
+        </td>
+      </tr>
+      {isExpanded && paymentHistory && Array.isArray(paymentHistory) && paymentHistory.length > 0 && (
+        <tr>
+          <td colSpan={6}>
+            <div className="bg-base-200 p-4 rounded-lg">
+              <h4 className="font-bold mb-2">Payment History</h4>
+              <div className="overflow-x-auto">
+                <table className="table table-xs">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                      <th>Transaction</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...paymentHistory]
+                      .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))
+                      .map((payment, index) => (
+                        <tr key={payment.paymentId.toString()}>
+                          <td>{formatDate(payment.timestamp)}</td>
+                          <td className="font-mono">{formatEther(payment.amount)} USDe</td>
+                          <td>
+                            <span className={`badge badge-sm ${payment.processed ? "badge-success" : "badge-warning"}`}>
+                              {payment.processed ? "Processed" : "Pending"}
+                            </span>
+                          </td>
+                          <td>
+                            <a
+                              href={`https://sepolia.etherscan.io/tx/${payment.txHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="link link-primary text-xs"
+                            >
+                              View Transaction
+                            </a>
+                          </td>
+                        </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 };
 
