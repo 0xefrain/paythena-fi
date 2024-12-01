@@ -1,14 +1,15 @@
 "use client";
 
-import { useContractRead } from 'wagmi';
-import { useTargetNetwork } from './useTargetNetwork';
-import { useDeployedContractInfo } from '~~/hooks/scaffold-eth';
-import { ContractName } from '~~/utils/scaffold-eth/contract';
+import { useTargetNetwork } from "./useTargetNetwork";
+import { useContractRead } from "wagmi";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { ContractName } from "~~/utils/scaffold-eth/contract";
 
-export const useScaffoldReadContract = <
-  TContractName extends ContractName,
-  TFunctionName extends string = string,
->({ contractName, functionName, args, ...config }: {
+export const useScaffoldReadContract = <TContractName extends ContractName, TFunctionName extends string = string>({
+  contractName,
+  functionName,
+  args,
+}: {
   contractName: TContractName;
   functionName: TFunctionName;
   args?: any[];
@@ -22,9 +23,6 @@ export const useScaffoldReadContract = <
     functionName,
     args,
     chainId: targetNetwork.id,
-    onError: (error) => {
-      console.error(`Contract read error (${contractName}.${functionName}):`, error);
-    },
   });
 
   console.log(`Contract read (${contractName}.${functionName}):`, {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useAccount } from "wagmi";
 import { useRouter } from "next/navigation";
+import { useAccount } from "wagmi";
 
 export const useWalletState = () => {
   const { address, isConnecting, isDisconnected } = useAccount();
@@ -12,7 +12,7 @@ export const useWalletState = () => {
     if (typeof window !== "undefined") {
       // Get last connected address from localStorage
       const lastAddress = localStorage.getItem("lastConnectedAddress");
-      
+
       if (address) {
         // Save current address
         localStorage.setItem("lastConnectedAddress", address);
@@ -34,4 +34,4 @@ export const useWalletState = () => {
     isDisconnected,
     hasLastSession: typeof window !== "undefined" ? !!localStorage.getItem("lastConnectedAddress") : false,
   };
-}; 
+};

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useTargetNetwork } from "./useTargetNetwork";
 import { useIsMounted } from "../useIsMounted";
+import { useTargetNetwork } from "./useTargetNetwork";
 import { usePublicClient } from "wagmi";
 import { Contract, ContractCodeStatus, ContractName, contracts } from "~~/utils/scaffold-eth/contract";
 

@@ -6,21 +6,29 @@ import { useAccount } from "wagmi";
 import { useScaffoldEventHistory, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { notification } from "~~/utils/scaffold-eth";
 
+// Define event type
+interface CompanyRegisteredEventArgs {
+  name: string;
+  company: `0x${string}`;
+}
+
+interface CompanyRegisteredEvent {
+  args: CompanyRegisteredEventArgs;
+}
+
 export const RegisterCompany = () => {
   const { address } = useAccount();
   const [companyName, setCompanyName] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const router = useRouter();
 
-  // Contract write function
   const { writeContractAsync: registerCompany } = useScaffoldWriteContract("PaythenaCore");
 
-  // Watch for registration events
-  const { data: registrationEvents } = useScaffoldEventHistory({
+  const { data: registrationEvents } = useScaffoldEventHistory<"PaythenaCore", "CompanyRegistered">({
     contractName: "PaythenaCore",
     eventName: "CompanyRegistered",
     fromBlock: BigInt(0),
-  });
+  }) as { data: CompanyRegisteredEvent[] };
 
   const handleRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +45,7 @@ export const RegisterCompany = () => {
     try {
       await registerCompany({
         functionName: "registerCompany",
-        args: [companyName] as const,
+        args: [companyName],
       });
       notification.success("Company registered successfully!");
       router.push("/dashboard");

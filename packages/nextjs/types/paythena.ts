@@ -22,4 +22,4 @@ export interface PaymentRecord {
   timestamp: bigint;
   amount: bigint;
   processed: boolean;
-} 
+}

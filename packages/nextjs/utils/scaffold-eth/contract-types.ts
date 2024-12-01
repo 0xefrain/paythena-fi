@@ -1,1 +1,1 @@
-export type ContractName = "MockUSDe" | "PaythenaCore" | "PaythenaLoan" | "PaythenaStaking" | "PaythenaAutomation"; 
+export type ContractName = "MockUSDe" | "PaythenaCore" | "PaythenaLoan" | "PaythenaStaking" | "PaythenaAutomation";

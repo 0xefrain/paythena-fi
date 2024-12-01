@@ -1,5 +1,5 @@
 import { useScaffoldReadContract } from "./useScaffoldReadContract";
-import { ContributorInfo, CompanyDetails, PaymentRecord } from "~~/types/paythena";
+import { CompanyDetails } from "~~/types/paythena";
 
 interface ContributorDetail {
   nextPayment: bigint;
@@ -12,7 +12,7 @@ interface ContributorDetail {
 interface PaythenaDataReturn {
   companyDetails: CompanyDetails;
   contributors: string[];
-  contributorDetails: ContributorDetail;
+  contributorDetails: ContributorDetail | undefined;
   refreshData: () => Promise<void>;
 }
 
@@ -22,33 +22,31 @@ export const usePaythenaData = (companyAddress: string, contributorAddress?: str
     contractName: "PaythenaCore",
     functionName: "getCompanyDetails",
     args: [companyAddress],
-    watch: true,
-    enabled: !!companyAddress,
-  });
+  }) as unknown as { data: [string, bigint, bigint, boolean] | undefined; refetch: () => Promise<any> };
 
   // Format company details to match our interface
-  const companyDetails = rawCompanyDetails ? {
-    name: rawCompanyDetails[0] as string,
-    balance: rawCompanyDetails[1] as bigint,
-    contributorCount: rawCompanyDetails[2] as bigint,
-    isActive: rawCompanyDetails[3] as boolean,
-  } : undefined;
+  const companyDetails = rawCompanyDetails
+    ? {
+        name: rawCompanyDetails[0] as string,
+        balance: rawCompanyDetails[1] as bigint,
+        contributorCount: rawCompanyDetails[2] as bigint,
+        isActive: rawCompanyDetails[3] as boolean,
+      }
+    : { name: "", balance: 0n, contributorCount: 0n, isActive: false };
 
   // Get active contributors
   const { data: contributors, refetch: refetchContributors } = useScaffoldReadContract({
     contractName: "PaythenaCore",
     functionName: "getActiveContributors",
     args: [companyAddress],
-    watch: true,
-    enabled: !!companyAddress && companyDetails?.isActive,
   });
 
   // Get contributor details if one is selected
-  const { data: contributorDetails } = useScaffoldReadContract({
+  const { data: contributorDetails, refetch: refetchContributor } = useScaffoldReadContract({
     contractName: "PaythenaCore",
     functionName: "getContributorDetails",
     args: [companyAddress, contributorAddress],
-  }) as { data: ContributorDetail };
+  }) as unknown as { data: ContributorDetail | undefined; refetch: () => Promise<any> };
 
   // Debug logging
   console.log("PaythenaData:", {
@@ -56,7 +54,7 @@ export const usePaythenaData = (companyAddress: string, contributorAddress?: str
     companyDetails,
     contributors,
     contributorAddress,
-    contributorDetails
+    contributorDetails,
   });
 
   return {
@@ -65,14 +63,12 @@ export const usePaythenaData = (companyAddress: string, contributorAddress?: str
     contributorDetails,
     refreshData: async () => {
       try {
-        await Promise.all([
-          refetchCompany(),
-          refetchContributors(),
-          contributorAddress && refetchContributor(),
-        ].filter(Boolean));
+        await Promise.all(
+          [refetchCompany(), refetchContributors(), contributorAddress && refetchContributor()].filter(Boolean),
+        );
       } catch (error) {
         console.error("Refresh error:", error);
       }
     },
   };
-}; 
+};

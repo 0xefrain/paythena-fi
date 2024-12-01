@@ -12,4 +12,4 @@ export const useIsMounted = () => {
   }, []);
 
   return useCallback(() => isMounted.current, []);
-}; 
+};
