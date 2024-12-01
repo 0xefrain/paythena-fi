@@ -33,8 +33,8 @@ B. Current Market Gaps
 
 ###  Paythena Solutions
 
-- Decentralized payroll solution
-- Ethena yield generation on tresuary funds sUSDE APY 25%
+- Decentralized payroll solution backed for Synthetic Dollar (USDe)
+- Ethena yield generation on tresuary funds Synthetic Dollar sUSDE APY 25%
 - Paythena will put Strong Focus on UX/UI and balanced between user experience and security
 - Decentralization solution easy to onboard contributors Worldwide
 
@@ -54,26 +54,26 @@ B. Current Market Gaps
 - Customizable payment schedules
 - Manual Execution
 - Automated execution
-- Staking USDe and earn sUSDE 
+- Staking  Synthetic Dollar (USDe) and earn sUSDE 
 - Good UX/UI
-- Implement Loan in USDe for your contributors
+- Implement Loan with Synthetic Dollar (USDe) for your contributors
 
 ** Contributor Management**
 
-- Payments in USDe
+- Payments with Synthetic Dollar USDe
 - Payments history
-- Request loan  in USDe
-- Staking options in USDe
+- Request loan  with Synthetic Dollar USDe
+- Staking options with Synthetic Dollar USDe
 
 ## 🎯 Roadmap
 
-- [x] Core payroll functionality
+- [x] Core payroll functionality (Backed for USDe)
 - [x] Company Dashboard
 - [x] Contributor Dashboard
-- [x] Payments in USDe
+- [x] Salary payments in Synthetic Dollar (USDe)
 - [x] Landing Page
-- [x] Loan System (demo)
-- [x] Staking System (demo)
+- [x] Loan System with Synthetic Dollar (USDe) (demo)
+- [x] Staking System with Synthetic Dollar (USDe) (demo)
 - [x] Automated payments mechanism(demo)
 - [ ] Reports xls,pdf
 - [ ] File upload for contributor address xls,pdf
