@@ -175,7 +175,7 @@ Start Frontend
 - ❌ Production/Mainnet deployment
 - ❌ Real fund management  
 
-# 🏆 Hackathon Success
+## 🏆 Hackathon Success
 
 Built during the Ethena Hackathon 2024 by Encode . Features implemented:
 - Decentralized payroll system
