@@ -32,7 +32,7 @@ export default function Home() {
                   Get USDe
                 </a>
                 <a
-                  href="https://github.com/yourusername/paythena"
+                  href="https://github.com/0xefrain/paythena-fi"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-outline btn-lg gap-2"
