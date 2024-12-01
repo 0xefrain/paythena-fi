@@ -68,18 +68,19 @@ B. Current Market Gaps
 ## 🎯 Roadmap
 
 - [x] Core payroll functionality (Backed for USDe)
-- [x] Company Dashboard
-- [x] Contributor Dashboard
+- [x] Company dashboard
+- [x] Contributor dashboard
 - [x] Salary payments in Synthetic Dollar (USDe)
 - [x] Landing Page
 - [x] Loan System with Synthetic Dollar (USDe) (demo)
 - [x] Staking System with Synthetic Dollar (USDe) (demo)
 - [x] Automated payments mechanism(demo)
+- [ ] Improvements in UX/UI
 - [ ] Reports xls,pdf
 - [ ] File upload for contributor address xls,pdf
 - [ ] Integration with ENS
-- [ ] Account Abstarction and UX/UI improvements
-- [ ] Email and Phone notifications
+- [ ] Account Abstraction
+- [ ] Email and phone notifications
 - [ ] Security and code audits
 
 
