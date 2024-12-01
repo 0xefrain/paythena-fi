@@ -45,7 +45,8 @@ B. Current Market Gaps
 
 ## Demo
 
-<a href="https://paythenafi.vercel.app/" target="_blank" rel="noopener noreferrer">Paythena Dapp</a>
+[Paythena Dapp](https://paythenafi.vercel.app/)
+
 
 ## ✨ Key Features
 
