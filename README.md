@@ -1,5 +1,5 @@
 
-![Logo](https://github.com/0xefrain/paythena-fi/blob/main/Screenshot.png)
+![Logo](https://github.com/0xefrain/paythena-fi/blob/main/packages/screenshots/Screenshot.png)
 
 
 # Paythena - Decentralized Payroll System with Salary-Backed Lending on Ethena Protocol
@@ -41,10 +41,7 @@ B. Current Market Gaps
 
 ## Screenshots
 
-![App Screenshot](https://via.placeholder.com/468x300?text=App+Screenshot+Here)
-
-## Demo
-
+![App Screenshot](https://github.com/0xefrain/paythena-fi/blob/main/packages/screenshots/paythenafi.png)
 
 
 ## ✨ Key Features
